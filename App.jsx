@@ -1,10 +1,23 @@
 import { useState, useEffect } from "react";
 
 // ── 아바타 선택지 ──────────────────────────────────────────────────────────
-const AVATARS = ["🔥","⚡","🎯","💫","🏆","🦁","🐯","🦊","🐺","🎸","🏄","🎮","🌊","🌙","⭐"];
+const AVATARS = [
+  // 볼링 & 스포츠
+  "🎳","🏅","🥇","⚽","🏀","⚾","🎾","🏸","🥊","🎱",
+  // 동물
+  "🦁","🐯","🦊","🐺","🐻","🐼","🦅","🦋","🐲","🦄",
+  // 파워 & 감정
+  "🔥","⚡","💫","🎯","🏆","💥","👑","😎","🤩","😈",
+  // 자연 & 기타
+  "🌊","🌙","⭐","🌈","❄️","🌸","🍀","🎸","🎮","🚀",
+  // 탈것
+  "🚗","🏎️","🚕","🚙","🏍️","✈️","🚂","🚢","🚁","🛸",
+  // 음식
+  "🍕","🍔","🍜","🍣","🍩","🎂","🍦","🍗","🥩","🍺",
+];
 
 // ── 초기 데이터 ────────────────────────────────────────────────────────────
-function getUpcomingFridays(count = 6) {
+function getUpcomingFridays(count = 5) {
   const fridays = [];
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -15,7 +28,7 @@ function getUpcomingFridays(count = 6) {
   return fridays;
 }
 
-const INITIAL_SESSIONS = getUpcomingFridays(6).map((date, i) => ({
+const INITIAL_SESSIONS = getUpcomingFridays(5).map((date, i) => ({
   id: `s${i + 1}`, date, participants: {}, fee: 0, comments: [],
 }));
 
@@ -354,6 +367,9 @@ export default function App() {
     try { const d = localStorage.getItem("bjf_posts"); return d ? JSON.parse(d) : INITIAL_POSTS; } catch { return INITIAL_POSTS; }
   });
   const [tournament] = useState(INITIAL_TOURNAMENT);
+  const [announcements, setAnnouncements] = useState(() => {
+    try { const d = localStorage.getItem("bjf_announcements"); return d ? JSON.parse(d) : []; } catch { return []; }
+  });
   const [rules, setRules] = useState(() => {
     try { const d = localStorage.getItem("bjf_rules"); return d ? JSON.parse(d) : INITIAL_RULES; } catch { return INITIAL_RULES; }
   });
@@ -366,6 +382,7 @@ export default function App() {
   useEffect(() => { try { localStorage.setItem("bjf_sessions", JSON.stringify(sessions)); } catch {} }, [sessions]);
   useEffect(() => { try { localStorage.setItem("bjf_rules", JSON.stringify(rules)); } catch {} }, [rules]);
   useEffect(() => { try { localStorage.setItem("bjf_posts", JSON.stringify(posts)); } catch {} }, [posts]);
+  useEffect(() => { try { localStorage.setItem("bjf_announcements", JSON.stringify(announcements)); } catch {} }, [announcements]);
 
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("login"); // "login" | "signup"
@@ -400,6 +417,17 @@ export default function App() {
   const [feeInputs, setFeeInputs] = useState({});
   const [confirmDeleteId, setConfirmDeleteId] = useState(null); // 삭제 확인 상태
   const [sessionCmtInputs, setSessionCmtInputs] = useState({}); // 회차별 댓글 입력
+
+  // ── 새 리그 추가 폼 ──
+  const [showAddSession, setShowAddSession] = useState(false);
+  const [addSessionForm, setAddSessionForm] = useState({ date: "", note: "" });
+
+  // ── 스코어 입력 ──
+  const [scoreInputs, setScoreInputs] = useState({});
+
+  // ── 공지 폼 ──
+  const [showAnnoForm, setShowAnnoForm] = useState(false);
+  const [annoForm, setAnnoForm] = useState({ title: "", content: "" });
 
   const handleLogin = () => {
     setLErr("");
@@ -523,6 +551,37 @@ export default function App() {
     setUsers(prev => prev.filter(u => u.id !== uid));
   };
 
+  const addSession = () => {
+    if (!addSessionForm.date) return;
+    const newSession = {
+      id: `s_${Date.now()}`,
+      date: new Date(addSessionForm.date),
+      participants: {},
+      fee: 0,
+      comments: [],
+      note: addSessionForm.note.trim(),
+    };
+    setSessions(prev => [...prev, newSession].sort((a, b) => new Date(a.date) - new Date(b.date)));
+    setAddSessionForm({ date: "", note: "" });
+    setShowAddSession(false);
+  };
+
+  const saveScore = (sid, uid) => {
+    const key = `${sid}_${uid}`;
+    const inp = scoreInputs[key] || {};
+    setSessions(prev => prev.map(s => {
+      if (s.id !== sid) return s;
+      const scores = { ...(s.scores || {}) };
+      const prev_games = ((s.scores || {})[uid] || {}).games || [null,null,null,null,null];
+      scores[uid] = { games: [1,2,3,4,5].map(i => {
+        const v = inp[`g${i}`];
+        if (v !== undefined) return v === "" ? null : (parseInt(v) >= 0 ? parseInt(v) : null);
+        return prev_games[i-1] !== undefined ? prev_games[i-1] : null;
+      })};
+      return { ...s, scores };
+    }));
+  };
+
   const chev = (open) => (
     <svg style={{transition:"transform .2s",transform:open?"rotate(180deg)":"none",color:"var(--mu)"}} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
   );
@@ -623,6 +682,8 @@ export default function App() {
     { id:"gallery",  label:"갤러리",   icon:"img" },
     { id:"rules",    label:"규칙/방법",  icon:"book" },
     { id:"board",    label:"자유게시판",icon:"msg" },
+    { id:"mypage",   label:"내 정보",   icon:"trophy" },
+    { id:"average",  label:"아베 표",   icon:"users"  },
     ...(isAdmin ? [{ id:"admin", label:"관리", icon:"admin" }] : []),
   ];
 
@@ -654,6 +715,21 @@ export default function App() {
           {/* ── 출결 신청 ── */}
           {tab==="schedule" && (
             <div className="slist">
+              {/* 공지사항 배너 */}
+              {announcements.length > 0 && (
+                <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:4}}>
+                  {announcements.map(a => (
+                    <div key={a.id} style={{background:"rgba(245,197,66,0.07)",border:"1px solid rgba(245,197,66,0.3)",borderRadius:"var(--r)",padding:"14px 18px",display:"flex",gap:12,alignItems:"flex-start"}}>
+                      <span style={{fontSize:20,flexShrink:0}}>📢</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:14,fontWeight:700,color:"var(--yw)",marginBottom:4}}>{a.title}</div>
+                        <div style={{fontSize:13,color:"#c8c0a0",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{a.content}</div>
+                        <div style={{fontSize:10,color:"var(--mu)",marginTop:6}}>{a.date}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {sessions.length === 0 && (
                 <div style={{textAlign:"center",padding:"48px 0",color:"var(--mu)",fontSize:14}}>
                   등록된 리그전이 없습니다
@@ -673,6 +749,7 @@ export default function App() {
                           <div className="sdate">{fmtDate(s.date)}</div>
                           <div className="stime">⏰ 20:30 시작</div>
                           <div className="sdead">🔔 마감: 당일 17:00</div>
+                          {s.note && <div style={{fontSize:11,color:"var(--ac)",marginTop:2}}>📌 {s.note}</div>}
                         </div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",justifyContent:"flex-end"}}>
@@ -710,6 +787,15 @@ export default function App() {
                         }
                       </div>
                       <div className="pcnt" style={{marginTop:10}}><Ic n="users" s={13}/>현재 참가 예정: <strong style={{color:"var(--tx)",marginLeft:4}}>{joinCount}명</strong></div>
+                      {joinCount > 0 && (
+                        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:8}}>
+                          {users.filter(u => s.participants[u.id] === "join").map(u => (
+                            <span key={u.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:u.id===user.id?"rgba(79,124,255,0.15)":"var(--s2)",border:`1px solid ${u.id===user.id?"rgba(79,124,255,0.4)":"var(--bd)"}`,borderRadius:99,padding:"3px 10px",fontSize:12,color:u.id===user.id?"var(--ac)":"var(--tx)",fontWeight:u.id===user.id?700:400}}>
+                              {u.avatar} {u.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* 회차별 자유 게시판 */}
@@ -917,9 +1003,327 @@ export default function App() {
             </>
           )}
 
+          {/* ── 내 정보 ── */}
+          {tab==="mypage" && (() => {
+            const mySessions = sessions.map(s => ({
+              ...s,
+              status: s.participants[user.id],
+              myScore: ((s.scores || {})[user.id]) || { games: [null,null,null,null,null] },
+            }));
+            const played = mySessions.filter(s => s.status === "join");
+            const allScores = played.flatMap(s => (s.myScore.games || []).filter(g => g !== null && g !== undefined));
+            const totalGames = allScores.length;
+            const bestScore = totalGames > 0 ? Math.max(...allScores) : "—";
+            const avgScore = totalGames > 0 ? (allScores.reduce((a,b) => a+b, 0) / totalGames).toFixed(1) : "0.0";
+            const statBox = (label, val, color) => (
+              <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",padding:"16px",textAlign:"center"}}>
+                <div style={{fontSize:11,color:"var(--mu)",marginBottom:8,fontWeight:600}}>{label}</div>
+                <div style={{fontSize:28,fontWeight:900,color:color||"var(--tx)"}}>{val}</div>
+              </div>
+            );
+            return (
+              <>
+                {/* 프로필 카드 */}
+                <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",padding:"24px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:16}}>
+                  <div style={{fontSize:52,lineHeight:1}}>{user.avatar}</div>
+                  <div>
+                    <div style={{fontSize:20,fontWeight:900}}>{user.name}</div>
+                    <div style={{fontSize:12,color:"var(--mu)",marginTop:4}}>
+                      {user.role === "admin" ? "👑 관리자" : "⚽ 멤버"}
+                      {user.joinedAt && <span style={{marginLeft:10}}>가입일 {user.joinedAt}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 스탯 요약 */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
+                  {statBox("출전", played.length, "var(--ac)")}
+                  {statBox("총 게임", totalGames, "var(--yw)")}
+                  {statBox("최고 점수", bestScore, "var(--gn)")}
+                  {statBox("전체 평균", avgScore, "var(--ac2)")}
+                </div>
+
+                {/* 출결 현황 */}
+                <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden",marginBottom:16}}>
+                  <div style={{padding:"14px 18px",borderBottom:"1px solid var(--bd)",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:8}}>
+                    <Ic n="users" s={15}/>출결 현황
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column"}}>
+                    {mySessions.map((s,i) => {
+                      const joiners = users.filter(u => s.participants[u.id] === "join");
+                      return (
+                        <div key={s.id} style={{padding:"12px 18px",borderTop:i===0?"none":"1px solid var(--bd)",display:"flex",alignItems:"flex-start",gap:12}}>
+                          <div style={{minWidth:110}}>
+                            <div style={{fontSize:13,fontWeight:700}}>{fmtDate(s.date)}</div>
+                            {s.note && <div style={{fontSize:10,color:"var(--ac)",marginTop:2}}>📌{s.note}</div>}
+                          </div>
+                          <div style={{flex:1}}>
+                            {joiners.length === 0
+                              ? <span style={{fontSize:12,color:"var(--mu)"}}>참가자 없음</span>
+                              : <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                                  {joiners.map(u => (
+                                    <span key={u.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:u.id===user.id?"rgba(79,124,255,0.15)":"var(--s2)",border:`1px solid ${u.id===user.id?"rgba(79,124,255,0.4)":"var(--bd)"}`,borderRadius:99,padding:"3px 10px",fontSize:12,color:u.id===user.id?"var(--ac)":"var(--tx)",fontWeight:u.id===user.id?700:400}}>
+                                      {u.avatar} {u.name}
+                                    </span>
+                                  ))}
+                                </div>
+                            }
+                          </div>
+                          <span style={{fontSize:12,fontWeight:700,color:s.status==="join"?"var(--gn)":s.status==="skip"?"var(--rd)":"var(--mu)",whiteSpace:"nowrap"}}>
+                            {s.status==="join"?"✓ 참가":s.status==="skip"?"✕ 불참":"미정"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 스코어카드 테이블 */}
+                <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden"}}>
+                  <div style={{padding:"14px 18px",borderBottom:"1px solid var(--bd)",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:8}}>
+                    <Ic n="trophy" s={15}/>스코어카드 <span style={{fontSize:11,color:"var(--mu)",fontWeight:400,marginLeft:4}}>참가한 경기에 점수를 입력하세요</span>
+                  </div>
+                  <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",minWidth:560}}>
+                    <thead>
+                      <tr style={{background:"var(--s2)"}}>
+                        <th style={{padding:"10px 14px",fontSize:11,color:"var(--mu)",textAlign:"left",fontWeight:600}}>날짜</th>
+                        <th style={{padding:"10px 10px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>출결</th>
+                        {[1,2,3,4,5].map(i=>(
+                          <th key={i} style={{padding:"10px 8px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>G{i}</th>
+                        ))}
+                        <th style={{padding:"10px 10px",fontSize:11,color:"var(--yw)",textAlign:"center",fontWeight:600}}>평균</th>
+                        <th style={{padding:"10px 10px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mySessions.map(s => {
+                        const key = `${s.id}_${user.id}`;
+                        const inp = scoreInputs[key] || {};
+                        const saved = s.myScore.games || [null,null,null,null,null];
+                        const inpSt = {width:44,background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:6,padding:"4px 4px",color:"var(--tx)",fontSize:13,fontWeight:700,fontFamily:"inherit",outline:"none",textAlign:"center"};
+                        const rowScores = [1,2,3,4,5].map(i => {
+                          const v = inp[`g${i}`];
+                          return v !== undefined ? v : (saved[i-1] !== null && saved[i-1] !== undefined ? String(saved[i-1]) : "");
+                        });
+                        const validScores = rowScores.filter(v => v !== "" && !isNaN(parseInt(v))).map(Number);
+                        const rowAvg = validScores.length > 0 ? (validScores.reduce((a,b)=>a+b,0)/validScores.length).toFixed(1) : "—";
+                        return (
+                          <tr key={s.id} style={{borderTop:"1px solid var(--bd)"}}>
+                            <td style={{padding:"8px 14px",fontSize:12}}>
+                              {fmtDate(s.date)}
+                              {s.note && <div style={{fontSize:10,color:"var(--ac)"}}>📌{s.note}</div>}
+                            </td>
+                            <td style={{padding:"8px 10px",textAlign:"center"}}>
+                              <span style={{fontSize:11,fontWeight:700,color:s.status==="join"?"var(--gn)":s.status==="skip"?"var(--rd)":"var(--mu)"}}>
+                                {s.status==="join"?"✓":s.status==="skip"?"✕":"—"}
+                              </span>
+                            </td>
+                            {[1,2,3,4,5].map(i => (
+                              <td key={i} style={{padding:"6px 6px",textAlign:"center"}}>
+                                {s.status==="join"
+                                  ? <input type="number" min="0" max="300" style={inpSt} value={rowScores[i-1]}
+                                      onChange={e=>setScoreInputs(prev=>({...prev,[key]:{...(prev[key]||{}), [`g${i}`]:e.target.value}}))}
+                                      onKeyDown={e=>e.key==="Enter"&&saveScore(s.id,user.id)}/>
+                                  : <span style={{color:"var(--mu)",fontSize:12}}>—</span>}
+                              </td>
+                            ))}
+                            <td style={{padding:"8px 10px",textAlign:"center",fontSize:13,fontWeight:800,color:"var(--yw)"}}>{s.status==="join"?rowAvg:"—"}</td>
+                            <td style={{padding:"6px 10px",textAlign:"center"}}>
+                              {s.status==="join" && (
+                                <button onClick={()=>saveScore(s.id,user.id)}
+                                  style={{background:"rgba(79,124,255,0.15)",border:"1px solid rgba(79,124,255,0.35)",color:"var(--ac)",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
+                                  저장
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {mySessions.length === 0 && (
+                        <tr><td colSpan={9} style={{padding:"32px",textAlign:"center",color:"var(--mu)",fontSize:13}}>아직 리그전이 없습니다</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+
+          {/* ── 아베 표 ── */}
+          {tab==="average" && (() => {
+            const rankData = users.map(u => {
+              const allScores = sessions.flatMap(s => {
+                if (s.participants[u.id] !== "join") return [];
+                const games = ((s.scores || {})[u.id] || {}).games || [];
+                return games.filter(g => g !== null && g !== undefined && g >= 0);
+              });
+              const totalGames = allScores.length;
+              const totalScore = allScores.reduce((a,b) => a+b, 0);
+              const avg = totalGames > 0 ? totalScore / totalGames : 0;
+              const best = totalGames > 0 ? Math.max(...allScores) : 0;
+              const attended = sessions.filter(s => s.participants[u.id] === "join").length;
+              return { ...u, totalGames, totalScore, avg, best, attended };
+            }).sort((a,b) => b.avg - a.avg || b.totalGames - a.totalGames);
+
+            const medalColor = i => i===0?"var(--yw)":i===1?"#c0c8e0":i===2?"#cd7f32":"var(--mu)";
+            const medal = i => i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}`;
+
+            return (
+              <>
+                <div style={{fontSize:17,fontWeight:800,marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
+                  🎳 아베 표
+                  <span style={{fontSize:12,color:"var(--mu)",fontWeight:400}}>전체 {users.length}명</span>
+                </div>
+
+                {/* 1위 하이라이트 */}
+                {rankData[0]?.totalGames > 0 && (
+                  <div style={{background:"linear-gradient(135deg,rgba(245,197,66,0.12),rgba(79,124,255,0.08))",border:"1px solid rgba(245,197,66,0.3)",borderRadius:"var(--r)",padding:"20px 24px",marginBottom:16,display:"flex",alignItems:"center",gap:16}}>
+                    <div style={{fontSize:48,lineHeight:1}}>{rankData[0].avatar}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:11,color:"var(--yw)",fontWeight:700,letterSpacing:"0.08em",marginBottom:4}}>🥇 현재 1위</div>
+                      <div style={{fontSize:20,fontWeight:900}}>{rankData[0].name}</div>
+                      <div style={{fontSize:12,color:"var(--mu)",marginTop:4}}>{rankData[0].attended}회 출전 · {rankData[0].totalGames}게임</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:11,color:"var(--mu)",marginBottom:2}}>아베레이지</div>
+                      <div style={{fontSize:36,fontWeight:900,color:"var(--yw)",lineHeight:1}}>{rankData[0].avg.toFixed(1)}</div>
+                      <div style={{fontSize:11,color:"var(--mu)",marginTop:4}}>최고 {rankData[0].best}점</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 전체 순위표 */}
+                <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead>
+                      <tr style={{background:"var(--s2)"}}>
+                        <th style={{padding:"11px 16px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600,width:40}}>#</th>
+                        <th style={{padding:"11px 16px",fontSize:11,color:"var(--mu)",textAlign:"left",fontWeight:600}}>멤버</th>
+                        <th style={{padding:"11px 12px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>출전</th>
+                        <th style={{padding:"11px 12px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>게임</th>
+                        <th style={{padding:"11px 12px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>최고</th>
+                        <th style={{padding:"11px 16px",fontSize:11,color:"var(--yw)",textAlign:"center",fontWeight:700}}>아베</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rankData.map((u,i) => {
+                        const isMe = u.id === user.id;
+                        return (
+                          <tr key={u.id} style={{borderTop:"1px solid var(--bd)",background:isMe?"rgba(79,124,255,0.05)":"transparent"}}>
+                            <td style={{padding:"12px 16px",textAlign:"center",fontSize:16,fontWeight:900,color:medalColor(i)}}>{medal(i)}</td>
+                            <td style={{padding:"12px 16px"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                <span style={{fontSize:20}}>{u.avatar}</span>
+                                <span style={{fontSize:14,fontWeight:isMe?700:500,color:isMe?"var(--ac)":"var(--tx)"}}>{u.name}{isMe&&<span style={{fontSize:10,color:"var(--ac)",marginLeft:4}}>나</span>}</span>
+                              </div>
+                            </td>
+                            <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,color:"var(--mu)"}}>{u.attended}</td>
+                            <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,color:"var(--mu)"}}>{u.totalGames}</td>
+                            <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,fontWeight:600,color:u.best>0?"var(--gn)":"var(--mu)"}}>{u.best>0?u.best:"—"}</td>
+                            <td style={{padding:"12px 16px",textAlign:"center",fontSize:18,fontWeight:900,color:u.avg>0?"var(--yw)":"var(--mu)"}}>{u.avg>0?u.avg.toFixed(1):"—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {rankData.every(u=>u.totalGames===0) && (
+                  <div style={{textAlign:"center",padding:"32px 0",color:"var(--mu)",fontSize:13,marginTop:8}}>
+                    아직 입력된 스코어가 없습니다
+                  </div>
+                )}
+              </>
+            );
+          })()}
+
           {/* ── 관리자 ── */}
           {tab==="admin" && isAdmin && (
             <>
+              {/* ── 공지사항 관리 ── */}
+              <div style={{marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                  <div style={{fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>📢 공지사항 <span style={{fontSize:11,color:"var(--mu)",fontWeight:400}}>({announcements.length}건)</span></div>
+                  {!showAnnoForm && (
+                    <button className="fab" style={{margin:0,padding:"7px 14px",fontSize:12}} onClick={()=>setShowAnnoForm(true)}>
+                      <Ic n="plus" s={13}/>공지 작성
+                    </button>
+                  )}
+                </div>
+                {showAnnoForm && (
+                  <div className="form-box" style={{marginBottom:10}}>
+                    <div className="form-title">📢 새 공지 작성</div>
+                    <div className="frow"><label>제목 *</label><input placeholder="공지 제목" value={annoForm.title} onChange={e=>setAnnoForm(p=>({...p,title:e.target.value}))}/></div>
+                    <div className="frow"><label>내용 *</label><textarea rows={3} placeholder="공지 내용을 입력하세요" value={annoForm.content} onChange={e=>setAnnoForm(p=>({...p,content:e.target.value}))}/></div>
+                    <div className="fbtns">
+                      <button className="btn-ac" onClick={()=>{
+                        if (!annoForm.title.trim() || !annoForm.content.trim()) return;
+                        const now = new Date(); const p2 = n=>String(n).padStart(2,"0");
+                        setAnnouncements(prev=>[{id:`a${Date.now()}`,title:annoForm.title.trim(),content:annoForm.content.trim(),date:`${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`},...prev]);
+                        setAnnoForm({title:"",content:""});setShowAnnoForm(false);
+                      }}>등록</button>
+                      <button className="btn-ghost" onClick={()=>{setShowAnnoForm(false);setAnnoForm({title:"",content:""});}}>취소</button>
+                    </div>
+                  </div>
+                )}
+                {announcements.length > 0 && (
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {announcements.map(a=>(
+                      <div key={a.id} style={{background:"var(--s1)",border:"1px solid rgba(245,197,66,0.25)",borderRadius:10,padding:"12px 16px",display:"flex",alignItems:"flex-start",gap:10}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:13,fontWeight:700,color:"var(--yw)"}}>{a.title}</div>
+                          <div style={{fontSize:12,color:"#b0a880",marginTop:3,whiteSpace:"pre-wrap"}}>{a.content}</div>
+                          <div style={{fontSize:10,color:"var(--mu)",marginTop:4}}>{a.date}</div>
+                        </div>
+                        <button onClick={()=>setAnnouncements(prev=>prev.filter(x=>x.id!==a.id))}
+                          style={{background:"none",border:"none",color:"var(--mu)",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",padding:4}}>
+                          <Ic n="trash" s={14}/>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {announcements.length === 0 && !showAnnoForm && (
+                  <div style={{fontSize:12,color:"var(--mu)",padding:"8px 0"}}>등록된 공지가 없습니다</div>
+                )}
+              </div>
+
+              {/* ── 새 리그 추가 ── */}
+              <div style={{marginBottom:20}}>
+                {showAddSession ? (
+                  <div className="form-box" style={{marginBottom:0}}>
+                    <div className="form-title">📅 새 리그전 추가</div>
+                    <div className="frow">
+                      <label>날짜 *</label>
+                      <input
+                        type="date"
+                        value={addSessionForm.date}
+                        onChange={e => setAddSessionForm(p => ({...p, date: e.target.value}))}
+                        style={{colorScheme:"dark"}}
+                      />
+                    </div>
+                    <div className="frow">
+                      <label>메모 (선택)</label>
+                      <input
+                        placeholder="예: 특별 이벤트, 장소 변경 등"
+                        value={addSessionForm.note}
+                        onChange={e => setAddSessionForm(p => ({...p, note: e.target.value}))}
+                      />
+                    </div>
+                    <div className="fbtns">
+                      <button className="btn-ac" onClick={addSession}>추가하기</button>
+                      <button className="btn-ghost" onClick={() => { setShowAddSession(false); setAddSessionForm({ date: "", note: "" }); }}>취소</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="fab" onClick={() => setShowAddSession(true)}>
+                    <Ic n="plus" s={15}/>새 리그전 추가
+                  </button>
+                )}
+              </div>
+
               <div className="sgrid">
                 <div className="sbox"><div className="slbl">참가</div><div className="sval g">{totalJoins}</div></div>
                 <div className="sbox"><div className="slbl">불참</div><div className="sval r">{totalSkips}</div></div>
@@ -958,6 +1362,7 @@ export default function App() {
                           <div>
                             <div className="sdate" style={{fontSize:14}}>{fmtDate(s.date)}</div>
                             <div className="stime">20:30〜 / 마감 17:00</div>
+                            {s.note && <div style={{fontSize:11,color:"var(--ac)",marginTop:2}}>📌 {s.note}</div>}
                           </div>
                         </div>
                         <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -1003,8 +1408,49 @@ export default function App() {
                         </div>
                       )}
                     </div>
+                    {/* 🎳 스코어 입력 — 항상 표시 */}
+                    <div style={{borderTop:"1px solid var(--bd)",padding:"14px 18px"}}>
+                      <div style={{fontSize:12,color:"var(--tx)",fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
+                        🎳 스코어 입력
+                        {members.filter(m=>s.participants[m.id]==="join").length===0 && (
+                          <span style={{fontSize:11,color:"var(--mu)",fontWeight:400}}>— 참가 신청한 멤버가 없습니다</span>
+                        )}
+                      </div>
+                      {members.filter(m => s.participants[m.id] === "join").map(m => {
+                        const key = `${s.id}_${m.id}`;
+                        const savedGames = (((s.scores || {})[m.id]) || {}).games || [null,null,null,null,null];
+                        const inp = scoreInputs[key] || {};
+                        const inputSt = {width:48,background:"var(--bg)",border:"1px solid var(--bd)",borderRadius:8,padding:"5px 6px",color:"var(--tx)",fontSize:13,fontWeight:700,fontFamily:"inherit",outline:"none",textAlign:"center"};
+                        return (
+                          <div key={m.id} style={{marginBottom:10,padding:"10px 12px",background:"var(--s2)",borderRadius:10,border:"1px solid var(--bd)"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                              <span style={{fontSize:18}}>{m.avatar}</span>
+                              <span style={{fontSize:13,fontWeight:700}}>{m.name}</span>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                              {[1,2,3,4,5].map(i => {
+                                const v = inp[`g${i}`];
+                                const val = v !== undefined ? v : (savedGames[i-1] !== null && savedGames[i-1] !== undefined ? String(savedGames[i-1]) : "");
+                                return (
+                                  <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                                    <span style={{fontSize:10,color:"var(--mu)",fontWeight:600}}>G{i}</span>
+                                    <input type="number" min="0" max="300" style={inputSt} value={val}
+                                      onChange={e=>setScoreInputs(prev=>({...prev,[key]:{...(prev[key]||{}), [`g${i}`]:e.target.value}}))}/>
+                                  </div>
+                                );
+                              })}
+                              <button onClick={()=>saveScore(s.id,m.id)}
+                                style={{background:"linear-gradient(135deg,var(--ac),var(--ac2))",border:"none",color:"#fff",borderRadius:8,padding:"6px 16px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit",marginTop:16,alignSelf:"flex-end",boxShadow:"0 4px 12px rgba(79,124,255,0.3)"}}>
+                                저장
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
                     {/* 출결 목록 — 클릭으로 펼침 */}
-                    <div className="acard-hdr" onClick={()=>setExpanded(isExp?null:s.id)} style={{padding:"10px 18px"}}>
+                    <div className="acard-hdr" onClick={()=>setExpanded(isExp?null:s.id)} style={{padding:"10px 18px",borderTop:"1px solid var(--bd)"}}>
                       <span style={{fontSize:12,color:"var(--mu)",fontWeight:600}}>출결 명단 보기</span>
                       {chev(isExp)}
                     </div>
