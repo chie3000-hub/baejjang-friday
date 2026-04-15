@@ -449,6 +449,18 @@ export default function App() {
     })();
   }, [loadUsers, loadSessions, loadGallery, loadPosts, loadAnnouncements, loadRules]);
 
+  // ログイン済みユーザーの nickname/birthday を DB から同期（localStorage 復元時に欠ける場合の対策）
+  useEffect(() => {
+    if (!user || users.length === 0) return;
+    const fresh = users.find(u => u.id === user.id);
+    if (!fresh) return;
+    if (fresh.nickname !== (user.nickname ?? "") || fresh.birthday !== (user.birthday ?? "")) {
+      const updated = { ...user, nickname: fresh.nickname || "", birthday: fresh.birthday || "" };
+      setUser(updated);
+      localStorage.setItem("bjf_session", JSON.stringify(updated));
+    }
+  }, [users]);
+
   useEffect(() => {
     const chan = supabase.channel("bjf-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "participants" }, loadSessions)
@@ -1452,7 +1464,7 @@ export default function App() {
                               style={{background:"var(--s2)",border:"1px solid var(--bd)",color:"var(--mu)",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>취소</button>
                           </div>
                         ) : (
-                          <button className="del-btn" onClick={()=>setConfirmDeleteUserId(m.id)}><Ic n="trash" s={13}/>삭제</button>
+                          <button className="del-btn" onClick={()=>{ setConfirmDeleteUserId(m.id); setTimeout(()=>setConfirmDeleteUserId(null),4000); }}><Ic n="trash" s={13}/>삭제</button>
                         )}
                       </div>
                       <div className="member-extra">
@@ -1460,10 +1472,7 @@ export default function App() {
                         <div className="member-tag">불참 <b style={{color:"var(--rd)"}}>{skipCount}회</b></div>
                         <div className="member-tag">미응답 <b>{sessions.length - joinCount - skipCount}회</b></div>
                         {m.birthday && (() => {
-                          const today = new Date();
-                          const bday = new Date(m.birthday);
-                          const thisYear = new Date(today.getFullYear(), bday.getMonth(), bday.getDate());
-                          const diff = Math.floor((today - new Date(m.birthday)) / (365.25 * 24 * 3600 * 1000));
+                          const diff = Math.floor((new Date() - new Date(m.birthday)) / (365.25 * 24 * 3600 * 1000));
                           return <div className="member-tag">나이 <b>{diff}세</b></div>;
                         })()}
                       </div>
