@@ -292,6 +292,23 @@ const CSS = `
   .fee-total-row{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-top:1px solid var(--bd);background:rgba(45,220,120,0.03);}
   .fee-total-label{font-size:12px;color:var(--mu);}
   .fee-total-val{font-size:15px;font-weight:800;color:var(--gn);}
+
+  /* 상품 관리 */
+  .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:6px;}
+  .product-card{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;transition:border-color .2s;}
+  .product-card:hover{border-color:#2e3a60;}
+  .product-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .product-name{font-size:14px;font-weight:700;line-height:1.3;}
+  .product-desc{font-size:11px;color:var(--mu);margin-top:3px;line-height:1.5;}
+  .product-price{font-size:18px;font-weight:900;color:var(--yw);}
+  .product-price span{font-size:11px;font-weight:400;color:var(--mu);margin-left:2px;}
+  .stock-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;}
+  .stock-ok{background:rgba(45,220,120,.12);color:var(--gn);border:1px solid rgba(45,220,120,.25);}
+  .stock-low{background:rgba(245,197,66,.12);color:var(--yw);border:1px solid rgba(245,197,66,.25);}
+  .stock-zero{background:rgba(255,79,107,.12);color:var(--rd);border:1px solid rgba(255,79,107,.25);}
+  .product-actions{display:flex;gap:6px;margin-top:4px;}
+  .btn-edit-sm{background:var(--s2);border:1px solid var(--bd);color:var(--mu);border-radius:7px;padding:5px 10px;font-size:11px;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:3px;transition:all .15s;}
+  .btn-edit-sm:hover{color:var(--tx);border-color:var(--ac);}
 `;
 
 // ── メインアプリ ────────────────────────────────────────────────────────────
@@ -306,6 +323,13 @@ export default function App() {
   const [showRuleForm, setShowRuleForm] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
   const [ruleForm, setRuleForm] = useState({ icon: "📌", title: "", content: "" });
+
+  // ── 상품 관리 ──
+  const [products, setProducts] = useState([]);
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [productForm, setProductForm] = useState({ name: "", price: "", stock: "", description: "" });
+  const [productDeleteId, setProductDeleteId] = useState(null);
 
   const [user, setUser] = useState(() => {
     try { const d = localStorage.getItem("bjf_session"); return d ? JSON.parse(d) : null; } catch { return null; }
@@ -442,12 +466,17 @@ export default function App() {
     if (data) setRules(data.map(r => ({ id: r.id, icon: r.icon, title: r.title, content: r.content })));
   }, []);
 
+  const loadProducts = useCallback(async () => {
+    const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
+    if (data) setProducts(data.map(p => ({ id: p.id, name: p.name, price: p.price, stock: p.stock, description: p.description || "" })));
+  }, []);
+
   useEffect(() => {
     (async () => {
-      await Promise.all([loadUsers(), loadSessions(), loadGallery(), loadPosts(), loadAnnouncements(), loadRules()]);
+      await Promise.all([loadUsers(), loadSessions(), loadGallery(), loadPosts(), loadAnnouncements(), loadRules(), loadProducts()]);
       setLoading(false);
     })();
-  }, [loadUsers, loadSessions, loadGallery, loadPosts, loadAnnouncements, loadRules]);
+  }, [loadUsers, loadSessions, loadGallery, loadPosts, loadAnnouncements, loadRules, loadProducts]);
 
   // ログイン済みユーザーの nickname/birthday を DB から同期（localStorage 復元時に欠ける場合の対策）
   useEffect(() => {
@@ -1343,6 +1372,101 @@ export default function App() {
           {/* ── 관리자 ── */}
           {tab==="admin" && isAdmin && (
             <>
+              {/* ── 상품 관리 ── */}
+              <div style={{marginBottom:24}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                  <div style={{fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
+                    🛍️ 상품 관리 <span style={{fontSize:11,color:"var(--mu)",fontWeight:400}}>({products.length}개)</span>
+                  </div>
+                  {!showProductForm && !editingProduct && (
+                    <button className="fab" style={{margin:0,padding:"7px 14px",fontSize:12}} onClick={()=>{ setProductForm({name:"",price:"",stock:"",description:""}); setShowProductForm(true); }}>
+                      <Ic n="plus" s={13}/>상품 추가
+                    </button>
+                  )}
+                </div>
+
+                {(showProductForm || editingProduct) && (
+                  <div className="form-box" style={{marginBottom:12}}>
+                    <div className="form-title">{editingProduct ? "✏️ 상품 편집" : "🛍️ 새 상품 추가"}</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <div className="frow" style={{margin:0}}>
+                        <label>상품명 *</label>
+                        <input placeholder="예: 볼링공 클리너" value={productForm.name} onChange={e=>setProductForm(p=>({...p,name:e.target.value}))}/>
+                      </div>
+                      <div className="frow" style={{margin:0}}>
+                        <label>가격 (원) *</label>
+                        <input type="number" min="0" placeholder="0" value={productForm.price} onChange={e=>setProductForm(p=>({...p,price:e.target.value}))}/>
+                      </div>
+                      <div className="frow" style={{margin:0}}>
+                        <label>재고 수량 *</label>
+                        <input type="number" min="0" placeholder="0" value={productForm.stock} onChange={e=>setProductForm(p=>({...p,stock:e.target.value}))}/>
+                      </div>
+                      <div className="frow" style={{margin:0}}>
+                        <label>설명 (선택)</label>
+                        <input placeholder="상품 설명" value={productForm.description} onChange={e=>setProductForm(p=>({...p,description:e.target.value}))}/>
+                      </div>
+                    </div>
+                    <div className="fbtns" style={{marginTop:12}}>
+                      <button className="btn-ac" onClick={async ()=>{
+                        if (!productForm.name.trim() || productForm.price === "" || productForm.stock === "") return;
+                        const payload = { name: productForm.name.trim(), price: parseInt(productForm.price)||0, stock: parseInt(productForm.stock)||0, description: productForm.description.trim()||null };
+                        if (editingProduct) {
+                          await supabase.from("products").update(payload).eq("id", editingProduct.id);
+                          setEditingProduct(null);
+                        } else {
+                          await supabase.from("products").insert(payload);
+                          setShowProductForm(false);
+                        }
+                        setProductForm({name:"",price:"",stock:"",description:""});
+                        await loadProducts();
+                      }}>{editingProduct ? "저장" : "등록"}</button>
+                      <button className="btn-ghost" onClick={()=>{ setShowProductForm(false); setEditingProduct(null); setProductForm({name:"",price:"",stock:"",description:""}); }}>취소</button>
+                    </div>
+                  </div>
+                )}
+
+                {products.length === 0 && !showProductForm && (
+                  <div style={{fontSize:12,color:"var(--mu)",padding:"8px 0"}}>등록된 상품이 없습니다</div>
+                )}
+
+                <div className="product-grid">
+                  {products.map(p => {
+                    const stockClass = p.stock === 0 ? "stock-zero" : p.stock <= 3 ? "stock-low" : "stock-ok";
+                    const stockLabel = p.stock === 0 ? "품절" : p.stock <= 3 ? `잔여 ${p.stock}개` : `재고 ${p.stock}개`;
+                    const isDeleting = productDeleteId === p.id;
+                    return (
+                      <div className="product-card" key={p.id}>
+                        <div className="product-card-top">
+                          <div>
+                            <div className="product-name">{p.name}</div>
+                            {p.description && <div className="product-desc">{p.description}</div>}
+                          </div>
+                          <span className={`stock-badge ${stockClass}`}>{stockLabel}</span>
+                        </div>
+                        <div className="product-price">{p.price.toLocaleString()}<span>원</span></div>
+                        <div className="product-actions">
+                          <button className="btn-edit-sm" onClick={()=>{ setEditingProduct(p); setProductForm({name:p.name,price:String(p.price),stock:String(p.stock),description:p.description||""}); setShowProductForm(false); }}>
+                            <Ic n="edit2" s={11}/>편집
+                          </button>
+                          {isDeleting ? (
+                            <>
+                              <button onClick={async ()=>{ await supabase.from("products").delete().eq("id",p.id); setProductDeleteId(null); await loadProducts(); }}
+                                style={{background:"var(--rd)",border:"none",color:"#fff",borderRadius:7,padding:"5px 10px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>확인</button>
+                              <button onClick={()=>setProductDeleteId(null)}
+                                style={{background:"var(--s2)",border:"1px solid var(--bd)",color:"var(--mu)",borderRadius:7,padding:"5px 8px",cursor:"pointer",fontSize:11,fontFamily:"inherit"}}>취소</button>
+                            </>
+                          ) : (
+                            <button className="del-btn" style={{padding:"5px 10px",fontSize:11}} onClick={()=>{ setProductDeleteId(p.id); setTimeout(()=>setProductDeleteId(null),4000); }}>
+                              <Ic n="trash" s={11}/>삭제
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* ── 공지사항 관리 ── */}
               <div style={{marginBottom:20}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
