@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "./src/supabase.js";
 
 // ── 아바타 선택지 ──────────────────────────────────────────────────────────
 const AVATARS = [
@@ -16,75 +17,13 @@ const AVATARS = [
   "🍕","🍔","🍜","🍣","🍩","🎂","🍦","🍗","🥩","🍺",
 ];
 
-// ── 초기 데이터 ────────────────────────────────────────────────────────────
-function getUpcomingFridays(count = 5) {
-  const fridays = [];
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  while (fridays.length < count) {
-    if (d.getDay() === 5) fridays.push(new Date(d));
-    d.setDate(d.getDate() + 1);
-  }
-  return fridays;
-}
-
-const INITIAL_SESSIONS = getUpcomingFridays(5).map((date, i) => ({
-  id: `s${i + 1}`, date, participants: {}, fee: 0, comments: [],
-}));
-
-const INITIAL_GALLERY = [
-  { id: "g1", sessionLabel: "3월 28일 리그전", author: "관리자", authorAvatar: "👑", date: "2025-03-29", url: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&q=80", caption: "이번 주 하이라이트! 🔥" },
-  { id: "g2", sessionLabel: "3월 21일 리그전", author: "관리자", authorAvatar: "👑", date: "2025-03-22", url: "https://images.unsplash.com/photo-1540747913346-19212a4b8f2e?w=600&q=80", caption: "단체 사진 📸" },
-];
-
-const INITIAL_TOURNAMENT = [
-  { id: "t1", season: "2025 시즌 1", date: "2025-03-01", rank: [
-    { place: 1, name: "김민준", avatar: "🔥", score: "48점", record: "8승 1무 1패" },
-    { place: 2, name: "정도윤", avatar: "🏆", score: "42점", record: "7승 0무 3패" },
-    { place: 3, name: "박지훈", avatar: "🎯", score: "36점", record: "6승 0무 4패" },
-  ]},
-];
-
-const INITIAL_POSTS = [
-  { id: "p1", author: "관리자", avatar: "👑", date: "2025-04-07 09:00", title: "📢 리그전 규칙 안내", content: "매주 금요일 20:30 시작! 참가 신청은 당일 17:00까지 해주세요.", likes: 5, likedBy: [], comments: [] },
-];
-
-const ADMIN = { id: "admin", name: "관리자", role: "admin", avatar: "👑", password: "admin123" };
-
-const INITIAL_RULES = [
-  {
-    id: "r1",
-    icon: "⚽",
-    title: "게임 방식",
-    content: "5vs5 풋살 리그전. 각 팀은 전반 15분 / 후반 15분으로 진행합니다.",
-  },
-  {
-    id: "r2",
-    icon: "📋",
-    title: "참가 신청",
-    content: "매주 금요일 당일 17:00까지 출결 신청을 완료해 주세요. 이후 신청은 불가합니다.",
-  },
-  {
-    id: "r3",
-    icon: "💰",
-    title: "참가비",
-    content: "참가비는 회차마다 다를 수 있습니다. 관리자 공지를 확인해 주세요.",
-  },
-  {
-    id: "r4",
-    icon: "🚫",
-    title: "주의사항",
-    content: "경기 중 과격한 플레이는 금지입니다. 페어플레이 정신을 지켜주세요!",
-  },
-  {
-    id: "r5",
-    icon: "📍",
-    title: "장소 & 시간",
-    content: "매주 금요일 20:30 시작. 장소는 매주 공지를 확인해 주세요.",
-  },
-];
-
 const fmtDate = (date) => date.toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" });
+const fmtDt = (ts) => {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const p2 = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+};
 
 // ── 아이콘 ────────────────────────────────────────────────────────────────
 const Ic = ({ n, s = 18 }) => {
@@ -314,13 +253,24 @@ const CSS = `
 
   /* MEMBER LIST */
   .member-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
-  .member-row{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
-  .member-info{display:flex;align-items:center;gap:10px;}
-  .member-av{font-size:22px;}
+  .member-row{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;}
+  .member-row-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .member-info{display:flex;align-items:center;gap:12px;flex:1;min-width:0;}
+  .member-av{font-size:26px;flex-shrink:0;}
   .member-name{font-size:14px;font-weight:700;}
-  .member-joined{font-size:11px;color:var(--mu);margin-top:2px;}
-  .del-btn{background:rgba(255,79,107,.1);border:1px solid rgba(255,79,107,.2);color:var(--rd);border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px;font-family:inherit;transition:all .15s;}
+  .member-meta{font-size:11px;color:var(--mu);margin-top:3px;display:flex;flex-wrap:wrap;gap:6px;}
+  .member-meta span{display:inline-flex;align-items:center;gap:3px;}
+  .member-extra{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd);}
+  .member-tag{display:inline-flex;align-items:center;gap:4px;background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:4px 10px;font-size:11px;color:var(--mu);}
+  .member-tag b{color:var(--tx);font-weight:600;}
+  .del-btn{background:rgba(255,79,107,.1);border:1px solid rgba(255,79,107,.2);color:var(--rd);border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px;font-family:inherit;transition:all .15s;flex-shrink:0;}
   .del-btn:hover{background:var(--rd);color:#fff;}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e2030;border:1px solid var(--bd);border-radius:12px;padding:12px 20px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:9999;animation:toastIn .2s ease;white-space:nowrap;}
+  .toast.error{border-color:rgba(255,79,107,.4);color:var(--rd);}
+  .toast.success{border-color:rgba(45,220,120,.4);color:var(--gn);}
+  @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
 
   /* MISC */
   .sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
@@ -346,55 +296,32 @@ const CSS = `
 
 // ── メインアプリ ────────────────────────────────────────────────────────────
 export default function App() {
-  // ── ストレージ管理 ──
-  const [users, setUsers] = useState(() => {
-    try { const d = localStorage.getItem("bjf_users"); return d ? JSON.parse(d) : [ADMIN]; } catch { return [ADMIN]; }
-  });
-  const [sessions, setSessions] = useState(() => {
-    try {
-      const saved = localStorage.getItem("bjf_sessions");
-      if (saved) {
-        // date は文字列で保存されるので Date オブジェクトに復元
-        return JSON.parse(saved).map(s => ({ ...s, date: new Date(s.date) }));
-      }
-    } catch {}
-    return INITIAL_SESSIONS;
-  });
-  const [gallery, setGallery] = useState(() => {
-    try { const d = localStorage.getItem("bjf_gallery"); return d ? JSON.parse(d) : INITIAL_GALLERY; } catch { return INITIAL_GALLERY; }
-  });
-  const [posts, setPosts] = useState(() => {
-    try { const d = localStorage.getItem("bjf_posts"); return d ? JSON.parse(d) : INITIAL_POSTS; } catch { return INITIAL_POSTS; }
-  });
-  const [tournament] = useState(INITIAL_TOURNAMENT);
-  const [announcements, setAnnouncements] = useState(() => {
-    try { const d = localStorage.getItem("bjf_announcements"); return d ? JSON.parse(d) : []; } catch { return []; }
-  });
-  const [rules, setRules] = useState(() => {
-    try { const d = localStorage.getItem("bjf_rules"); return d ? JSON.parse(d) : INITIAL_RULES; } catch { return INITIAL_RULES; }
-  });
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [gallery, setGallery] = useState([]);
+  const [posts, setPosts] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [rules, setRules] = useState([]);
   const [showRuleForm, setShowRuleForm] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
   const [ruleForm, setRuleForm] = useState({ icon: "📌", title: "", content: "" });
 
-  useEffect(() => { try { localStorage.setItem("bjf_users", JSON.stringify(users)); } catch {} }, [users]);
-  useEffect(() => { try { localStorage.setItem("bjf_gallery", JSON.stringify(gallery)); } catch {} }, [gallery]);
-  useEffect(() => { try { localStorage.setItem("bjf_sessions", JSON.stringify(sessions)); } catch {} }, [sessions]);
-  useEffect(() => { try { localStorage.setItem("bjf_rules", JSON.stringify(rules)); } catch {} }, [rules]);
-  useEffect(() => { try { localStorage.setItem("bjf_posts", JSON.stringify(posts)); } catch {} }, [posts]);
-  useEffect(() => { try { localStorage.setItem("bjf_announcements", JSON.stringify(announcements)); } catch {} }, [announcements]);
-
-  const [user, setUser] = useState(null);
-  const [authMode, setAuthMode] = useState("login"); // "login" | "signup"
+  const [user, setUser] = useState(() => {
+    try { const d = localStorage.getItem("bjf_session"); return d ? JSON.parse(d) : null; } catch { return null; }
+  });
+  const [authMode, setAuthMode] = useState("login");
   const [tab, setTab] = useState("schedule");
   const [expanded, setExpanded] = useState(null);
 
   // ── 로그인 폼 ──
   const [lName, setLName] = useState(() => { try { return localStorage.getItem("bjf_saved_name") || ""; } catch { return ""; } });
-  const [lPw, setLPw] = useState(() => { try { return localStorage.getItem("bjf_saved_pw") || ""; } catch { return ""; } });
+  const [lPw, setLPw] = useState("");
   const [lErr, setLErr] = useState("");
   const [showLPw, setShowLPw] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => { try { return localStorage.getItem("bjf_remember") === "1"; } catch { return false; } });
+  // T2: 기존 저장된 평문 비밀번호 제거
+  try { localStorage.removeItem("bjf_saved_pw"); } catch {}
 
   // ── 회원가입 폼 ──
   const [sName, setSName] = useState("");
@@ -415,8 +342,9 @@ export default function App() {
   const [expandedPost, setExpandedPost] = useState(null);
   const [cmtInputs, setCmtInputs] = useState({});
   const [feeInputs, setFeeInputs] = useState({});
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null); // 삭제 확인 상태
-  const [sessionCmtInputs, setSessionCmtInputs] = useState({}); // 회차별 댓글 입력
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmDeleteUserId, setConfirmDeleteUserId] = useState(null);
+  const [sessionCmtInputs, setSessionCmtInputs] = useState({});
 
   // ── 새 리그 추가 폼 ──
   const [showAddSession, setShowAddSession] = useState(false);
@@ -425,171 +353,293 @@ export default function App() {
   // ── 스코어 입력 ──
   const [scoreInputs, setScoreInputs] = useState({});
 
+  // ── 프로필 편집 ──
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editNickname, setEditNickname] = useState("");
+  const [editBirthday, setEditBirthday] = useState("");
+  const [editAvatar, setEditAvatar] = useState("🔥");
+  const [editPw, setEditPw] = useState("");
+  const [editPw2, setEditPw2] = useState("");
+  const [profileErr, setProfileErr] = useState("");
+  const [profileSuc, setProfileSuc] = useState("");
+
   // ── 공지 폼 ──
   const [showAnnoForm, setShowAnnoForm] = useState(false);
   const [annoForm, setAnnoForm] = useState({ title: "", content: "" });
 
-  const handleLogin = () => {
-    setLErr("");
-    const found = users.find(u => u.name === lName && u.password === lPw);
-    if (found) {
-      try {
-        if (rememberMe) {
-          localStorage.setItem("bjf_saved_name", lName);
-          localStorage.setItem("bjf_saved_pw", lPw);
-          localStorage.setItem("bjf_remember", "1");
-        } else {
-          localStorage.removeItem("bjf_saved_name");
-          localStorage.removeItem("bjf_saved_pw");
-          localStorage.setItem("bjf_remember", "0");
-        }
-      } catch {}
-      setUser(found);
-    }
-    else setLErr("이름 또는 비밀번호가 틀렸습니다.");
+  // ── 토스트 ──
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, type = "error") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSignup = () => {
+  // ── Supabase 데이터 로딩 ──
+  const loadUsers = useCallback(async () => {
+    const { data } = await supabase.from("users").select("id, name, nickname, birthday, role, avatar, joined_at").order("joined_at");
+    if (data) setUsers(data.map(u => ({ id: u.id, name: u.name, nickname: u.nickname || "", birthday: u.birthday || "", role: u.role, avatar: u.avatar, joinedAt: u.joined_at })));
+  }, []);
+
+  const loadSessions = useCallback(async () => {
+    const [sessRes, partRes, scoreRes, cmtRes] = await Promise.all([
+      supabase.from("sessions").select("*").order("date"),
+      supabase.from("participants").select("*"),
+      supabase.from("scores").select("*"),
+      supabase.from("session_comments").select("*, users(name, avatar)").order("created_at"),
+    ]);
+    const list = (sessRes.data || []).map(s => {
+      const parts = {};
+      (partRes.data || []).filter(p => p.session_id === s.id).forEach(p => { parts[p.user_id] = p.status; });
+      const scoresMap = {};
+      (scoreRes.data || []).filter(sc => sc.session_id === s.id).forEach(sc => { scoresMap[sc.user_id] = { games: sc.games || [] }; });
+      const comments = (cmtRes.data || []).filter(c => c.session_id === s.id).map(c => ({
+        id: c.id, author: c.users?.name || "?", avatar: c.users?.avatar || "👤",
+        text: c.text, date: fmtDt(c.created_at),
+      }));
+      return { id: s.id, date: new Date(s.date + "T12:00:00"), note: s.note || "", fee: s.fee || 0, participants: parts, scores: scoresMap, comments };
+    });
+    setSessions(list);
+  }, []);
+
+  const loadGallery = useCallback(async () => {
+    const { data } = await supabase.from("gallery").select("*, users(name, avatar)").order("created_at", { ascending: false });
+    if (data) setGallery(data.map(g => ({
+      id: g.id, sessionLabel: g.session_label || "자유 게시",
+      author: g.users?.name || "?", authorAvatar: g.users?.avatar || "👤",
+      date: (g.created_at || "").slice(0, 10), url: g.url, caption: g.caption,
+    })));
+  }, []);
+
+  const loadPosts = useCallback(async () => {
+    const [postRes, likeRes, cmtRes] = await Promise.all([
+      supabase.from("posts").select("*, users(name, avatar)").order("created_at", { ascending: false }),
+      supabase.from("post_likes").select("*"),
+      supabase.from("post_comments").select("*, users(name, avatar)").order("created_at"),
+    ]);
+    const list = (postRes.data || []).map(p => {
+      const likedBy = (likeRes.data || []).filter(l => l.post_id === p.id).map(l => l.user_id);
+      const comments = (cmtRes.data || []).filter(c => c.post_id === p.id).map(c => ({
+        id: c.id, author: c.users?.name || "?", avatar: c.users?.avatar || "👤",
+        text: c.text, date: fmtDt(c.created_at),
+      }));
+      return {
+        id: p.id, author: p.users?.name || "?", avatar: p.users?.avatar || "👤",
+        date: fmtDt(p.created_at), title: p.title, content: p.content,
+        likes: likedBy.length, likedBy, comments,
+      };
+    });
+    setPosts(list);
+  }, []);
+
+  const loadAnnouncements = useCallback(async () => {
+    const { data } = await supabase.from("announcements").select("*").order("created_at", { ascending: false });
+    if (data) setAnnouncements(data.map(a => ({ id: a.id, title: a.title, content: a.content, date: fmtDt(a.created_at) })));
+  }, []);
+
+  const loadRules = useCallback(async () => {
+    const { data } = await supabase.from("rules").select("*").order("order_index");
+    if (data) setRules(data.map(r => ({ id: r.id, icon: r.icon, title: r.title, content: r.content })));
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await Promise.all([loadUsers(), loadSessions(), loadGallery(), loadPosts(), loadAnnouncements(), loadRules()]);
+      setLoading(false);
+    })();
+  }, [loadUsers, loadSessions, loadGallery, loadPosts, loadAnnouncements, loadRules]);
+
+  useEffect(() => {
+    const chan = supabase.channel("bjf-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "participants" }, loadSessions)
+      .on("postgres_changes", { event: "*", schema: "public", table: "scores" }, loadSessions)
+      .subscribe();
+    return () => supabase.removeChannel(chan);
+  }, [loadSessions]);
+
+  // ── Auth ──
+  const handleLogin = async () => {
+    setLErr("");
+    const { data } = await supabase.from("users")
+      .select("id, name, nickname, birthday, role, avatar, joined_at")
+      .eq("name", lName).eq("password", lPw).maybeSingle();
+    if (data) {
+      const u = { id: data.id, name: data.name, nickname: data.nickname || "", birthday: data.birthday || "", role: data.role, avatar: data.avatar, joinedAt: data.joined_at };
+      if (rememberMe) {
+        localStorage.setItem("bjf_saved_name", lName);
+        localStorage.setItem("bjf_remember", "1");
+      } else {
+        localStorage.removeItem("bjf_saved_name");
+        localStorage.setItem("bjf_remember", "0");
+      }
+      localStorage.setItem("bjf_session", JSON.stringify(u));
+      setUser(u);
+    } else {
+      setLErr("이름 또는 비밀번호가 틀렸습니다.");
+    }
+  };
+
+  const handleSignup = async () => {
     setSErr(""); setSSuc("");
     if (!sName.trim()) return setSErr("이름을 입력해 주세요.");
     if (sName.trim().length < 2) return setSErr("이름은 2글자 이상이어야 합니다.");
-    if (users.find(u => u.name === sName.trim())) return setSErr("이미 사용 중인 이름입니다.");
     if (sPw.length < 4) return setSErr("비밀번호는 4자 이상이어야 합니다.");
     if (sPw !== sPw2) return setSErr("비밀번호가 일치하지 않습니다.");
-    const newUser = { id: `u_${Date.now()}`, name: sName.trim(), role: "member", avatar: sAvatar, password: sPw, joinedAt: new Date().toISOString().slice(0,10) };
-    setUsers(prev => [...prev, newUser]);
+    const { error } = await supabase.from("users").insert({ name: sName.trim(), password: sPw, avatar: sAvatar, role: "member" });
+    if (error) return setSErr(error.code === "23505" ? "이미 사용 중인 이름입니다." : "가입 중 오류가 발생했습니다.");
+    await loadUsers();
     setSSuc("가입 완료! 로그인해 주세요 🎉");
     setSName(""); setSPw(""); setSPw2("");
     setTimeout(() => { setAuthMode("login"); setSSuc(""); }, 1500);
+  };
+
+  const saveProfile = async () => {
+    setProfileErr(""); setProfileSuc("");
+    if (!editName.trim()) return setProfileErr("이름을 입력해 주세요.");
+    if (editName.trim().length < 2) return setProfileErr("이름은 2글자 이상이어야 합니다.");
+    if (editPw && editPw.length < 4) return setProfileErr("비밀번호는 4자 이상이어야 합니다.");
+    if (editPw && editPw !== editPw2) return setProfileErr("비밀번호가 일치하지 않습니다.");
+    const updates = { name: editName.trim(), nickname: editNickname.trim(), birthday: editBirthday || null, avatar: editAvatar };
+    if (editPw) updates.password = editPw;
+    const { error } = await supabase.from("users").update(updates).eq("id", user.id);
+    if (error) return setProfileErr(error.code === "23505" ? "이미 사용 중인 이름입니다." : "저장 중 오류가 발생했습니다.");
+    const updated = { ...user, name: editName.trim(), nickname: editNickname.trim(), birthday: editBirthday || "", avatar: editAvatar };
+    setUser(updated);
+    localStorage.setItem("bjf_session", JSON.stringify(updated));
+    await loadUsers();
+    setProfileSuc("프로필이 저장되었습니다 ✓");
+    setEditPw(""); setEditPw2("");
+    setTimeout(() => { setEditingProfile(false); setProfileSuc(""); }, 1200);
   };
 
   const isDeadlinePassed = (date) => {
     const d = new Date(date); d.setHours(17, 0, 0, 0); return new Date() > d;
   };
 
-  const toggleParticipant = (sid, status) => {
+  const toggleParticipant = async (sid, status) => {
     const s = sessions.find(x => x.id === sid);
     if (!s || isDeadlinePassed(s.date)) return;
-    setSessions(prev => prev.map(x => {
-      if (x.id !== sid) return x;
-      const cur = x.participants[user.id];
-      return { ...x, participants: { ...x.participants, [user.id]: cur === status ? null : status } };
-    }));
+    const cur = s.participants[user.id];
+    let err;
+    if (cur === status) {
+      ({ error: err } = await supabase.from("participants").delete().eq("session_id", sid).eq("user_id", user.id));
+    } else {
+      ({ error: err } = await supabase.from("participants").upsert({ session_id: sid, user_id: user.id, status }));
+    }
+    if (err) return showToast("참가 신청 중 오류가 발생했습니다.");
+    await loadSessions();
   };
 
-  const submitGallery = () => {
+  const submitGallery = async () => {
     if (!galForm.caption || !galForm.url) return;
-    setGallery(prev => [{ id: `g${Date.now()}`, sessionLabel: galForm.sessionLabel || "자유 게시", author: user.name, authorAvatar: user.avatar, date: new Date().toISOString().slice(0,10), url: galForm.url, caption: galForm.caption }, ...prev]);
+    await supabase.from("gallery").insert({ user_id: user.id, session_label: galForm.sessionLabel || "자유 게시", url: galForm.url, caption: galForm.caption });
     setGalForm({ sessionLabel: "", caption: "", url: "" }); setShowGalForm(false);
+    await loadGallery();
   };
 
-  const submitPost = () => {
+  const submitPost = async () => {
     if (!postForm.title || !postForm.content) return;
-    const now = new Date(); const p2 = n => String(n).padStart(2,"0");
-    setPosts(prev => [{ id: `p${Date.now()}`, author: user.name, avatar: user.avatar, date: `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`, title: postForm.title, content: postForm.content, likes: 0, likedBy: [], comments: [] }, ...prev]);
+    const { error } = await supabase.from("posts").insert({ user_id: user.id, title: postForm.title, content: postForm.content });
+    if (error) return showToast("게시글 작성 중 오류가 발생했습니다.");
     setPostForm({ title: "", content: "" }); setShowPostForm(false);
+    await loadPosts();
   };
 
-  const submitComment = (pid) => {
+  const submitComment = async (pid) => {
     const txt = cmtInputs[pid];
     if (!txt?.trim()) return;
-    const now = new Date(); const p2 = n => String(n).padStart(2,"0");
-    setPosts(prev => prev.map(p => p.id === pid ? { ...p, comments: [...p.comments, { id: `c${Date.now()}`, author: user.name, avatar: user.avatar, text: txt.trim(), date: `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}` }] } : p));
+    await supabase.from("post_comments").insert({ post_id: pid, user_id: user.id, text: txt.trim() });
     setCmtInputs(prev => ({ ...prev, [pid]: "" }));
+    await loadPosts();
   };
 
-  const toggleLike = (pid) => {
-    setPosts(prev => prev.map(p => {
-      if (p.id !== pid) return p;
-      const liked = (p.likedBy || []).includes(user.id);
-      return { ...p, likes: p.likes + (liked ? -1 : 1), likedBy: liked ? (p.likedBy||[]).filter(x=>x!==user.id) : [...(p.likedBy||[]), user.id] };
-    }));
+  const toggleLike = async (pid) => {
+    const post = posts.find(p => p.id === pid);
+    if (!post) return;
+    if ((post.likedBy || []).includes(user.id)) {
+      await supabase.from("post_likes").delete().eq("post_id", pid).eq("user_id", user.id);
+    } else {
+      await supabase.from("post_likes").insert({ post_id: pid, user_id: user.id });
+    }
+    await loadPosts();
   };
 
-  const updateFee = (sid) => {
-    const raw = feeInputs[sid];
-    const val = raw !== undefined ? (parseInt(raw) || 0) : 0;
-    setSessions(prev => prev.map(s => s.id === sid ? { ...s, fee: val } : s));
-    // feeInputs を保存済みの値に同期
+  const updateFee = async (sid) => {
+    const val = parseInt(feeInputs[sid]) || 0;
+    await supabase.from("sessions").update({ fee: val }).eq("id", sid);
     setFeeInputs(prev => ({ ...prev, [sid]: String(val) }));
+    await loadSessions();
   };
 
-  const submitSessionComment = (sid) => {
+  const submitSessionComment = async (sid) => {
     const txt = sessionCmtInputs[sid];
     if (!txt?.trim()) return;
-    const now = new Date(); const p2 = n => String(n).padStart(2,"0");
-    const newCmt = {
-      id: `sc${Date.now()}`,
-      author: user.name,
-      avatar: user.avatar,
-      text: txt.trim(),
-      date: `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
-    };
-    setSessions(prev => prev.map(s =>
-      s.id === sid ? { ...s, comments: [...(s.comments || []), newCmt] } : s
-    ));
+    const { error } = await supabase.from("session_comments").insert({ session_id: sid, user_id: user.id, text: txt.trim() });
+    if (error) return showToast("댓글 작성 중 오류가 발생했습니다.");
     setSessionCmtInputs(prev => ({ ...prev, [sid]: "" }));
+    await loadSessions();
   };
 
-  const deleteSessionComment = (sid, cid) => {
-    setSessions(prev => prev.map(s =>
-      s.id === sid ? { ...s, comments: (s.comments || []).filter(c => c.id !== cid) } : s
-    ));
+  const deleteSessionComment = async (sid, cid) => {
+    await supabase.from("session_comments").delete().eq("id", cid);
+    await loadSessions();
   };
 
-  const deleteSession = (sid) => {
+  const deleteSession = async (sid) => {
     if (confirmDeleteId === sid) {
-      setSessions(prev => prev.filter(s => s.id !== sid));
+      await supabase.from("sessions").delete().eq("id", sid);
       setConfirmDeleteId(null);
+      await loadSessions();
     } else {
       setConfirmDeleteId(sid);
-      setTimeout(() => setConfirmDeleteId(null), 3000); // 3秒後に自動キャンセル
+      setTimeout(() => setConfirmDeleteId(null), 3000);
     }
   };
 
-  const deleteUser = (uid) => {
-    setUsers(prev => prev.filter(u => u.id !== uid));
+  const deleteUser = async (uid) => {
+    await supabase.from("users").delete().eq("id", uid);
+    await loadUsers();
   };
 
-  const addSession = () => {
+  const addSession = async () => {
     if (!addSessionForm.date) return;
-    const newSession = {
-      id: `s_${Date.now()}`,
-      date: new Date(addSessionForm.date),
-      participants: {},
-      fee: 0,
-      comments: [],
-      note: addSessionForm.note.trim(),
-    };
-    setSessions(prev => [...prev, newSession].sort((a, b) => new Date(a.date) - new Date(b.date)));
-    setAddSessionForm({ date: "", note: "" });
-    setShowAddSession(false);
+    await supabase.from("sessions").insert({ date: addSessionForm.date, note: addSessionForm.note.trim() || null, fee: 0 });
+    setAddSessionForm({ date: "", note: "" }); setShowAddSession(false);
+    await loadSessions();
   };
 
-  const saveScore = (sid, uid) => {
+  const saveScore = async (sid, uid) => {
     const key = `${sid}_${uid}`;
     const inp = scoreInputs[key] || {};
-    setSessions(prev => prev.map(s => {
-      if (s.id !== sid) return s;
-      const scores = { ...(s.scores || {}) };
-      const prev_games = ((s.scores || {})[uid] || {}).games || [null,null,null,null,null];
-      scores[uid] = { games: [1,2,3,4,5].map(i => {
-        const v = inp[`g${i}`];
-        if (v !== undefined) return v === "" ? null : (parseInt(v) >= 0 ? parseInt(v) : null);
-        return prev_games[i-1] !== undefined ? prev_games[i-1] : null;
-      })};
-      return { ...s, scores };
-    }));
+    const s = sessions.find(x => x.id === sid);
+    if (!s) return;
+    const prevGames = ((s.scores || {})[uid] || {}).games || [null,null,null,null,null];
+    const games = [1,2,3,4,5].map(i => {
+      const v = inp[`g${i}`];
+      if (v !== undefined) return v === "" ? null : (parseInt(v) >= 0 ? parseInt(v) : null);
+      return prevGames[i-1] !== undefined ? prevGames[i-1] : null;
+    });
+    const { error } = await supabase.from("scores").upsert({ session_id: sid, user_id: uid, games });
+    if (error) return showToast("스코어 저장 중 오류가 발생했습니다.");
+    await loadSessions();
   };
 
   const chev = (open) => (
     <svg style={{transition:"transform .2s",transform:open?"rotate(180deg)":"none",color:"var(--mu)"}} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
   );
 
-  const nowStr = () => {
-    const now = new Date(); const p2 = n => String(n).padStart(2,"0");
-    return `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
-  };
+  // ── 로딩 화면 ──
+  if (loading) return (
+    <>
+      <style>{CSS}</style>
+      <div className="auth-wrap">
+        <div style={{textAlign:"center"}}>
+          <div className="logo-float"><LogoMark size={220}/></div>
+          <div style={{color:"var(--mu)",fontSize:13,marginTop:20,letterSpacing:"0.06em"}}>데이터 불러오는 중...</div>
+        </div>
+      </div>
+    </>
+  );
 
   // ── 인증 화면 ──
   if (!user) return (
@@ -632,9 +682,6 @@ export default function App() {
                 <label htmlFor="remember" style={{fontSize:12,color:"var(--mu)",cursor:"pointer",userSelect:"none"}}>로그인 정보 저장</label>
               </div>
               <button className="btn-primary" onClick={handleLogin}>로그인</button>
-              <div style={{marginTop:14,fontSize:11,color:"var(--mu)",textAlign:"center"}}>
-                관리자 로그인: 이름 <strong style={{color:"var(--tx)"}}>관리자</strong> / PW <strong style={{color:"var(--tx)"}}>admin123</strong>
-              </div>
             </>
           ) : (
             <>
@@ -690,6 +737,7 @@ export default function App() {
   return (
     <>
       <style>{CSS}</style>
+      {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
       <div className="app">
         <header className="hdr">
           <div className="hdr-l">
@@ -698,7 +746,7 @@ export default function App() {
           </div>
           <div className="hdr-r">
             <div className="hdr-user"><span>{user.avatar}</span><span>{user.name}</span></div>
-            <button className="ibtn" onClick={()=>setUser(null)}><Ic n="logout" s={16}/></button>
+            <button className="ibtn" onClick={()=>{localStorage.removeItem("bjf_session");setUser(null);}}><Ic n="logout" s={16}/></button>
           </div>
         </header>
 
@@ -741,7 +789,6 @@ export default function App() {
                 const closed = isDeadlinePassed(s.date);
                 return (
                   <div className="scard" key={s.id}>
-                    {/* 헤더 — 접기 없음 */}
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 18px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:12}}>
                         <span className="snum">#{String(i+1).padStart(2,"0")}</span>
@@ -775,7 +822,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 버튼 — 항상 표시 */}
                     <div style={{padding:"0 18px 16px",borderTop:"1px solid var(--bd)"}}>
                       <div className="arow" style={{marginTop:14}}>
                         {closed
@@ -800,7 +846,6 @@ export default function App() {
 
                     {/* 회차별 자유 게시판 */}
                     <div style={{borderTop:"1px solid var(--bd)"}}>
-                      {/* 댓글 목록 */}
                       {(s.comments||[]).length > 0 && (
                         <div style={{padding:"12px 18px",display:"flex",flexDirection:"column",gap:10}}>
                           {(s.comments||[]).map(c => (
@@ -824,7 +869,6 @@ export default function App() {
                           ))}
                         </div>
                       )}
-                      {/* 입력란 */}
                       <div style={{display:"flex",gap:8,padding:"10px 18px",borderTop:(s.comments||[]).length>0?"1px solid var(--bd)":"none"}}>
                         <span style={{fontSize:20,lineHeight:"36px"}}>{user.avatar}</span>
                         <input
@@ -889,7 +933,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* 관리자 등록/편집 폼 */}
               {isAdmin && showRuleForm && (
                 <div className="form-box" style={{marginBottom:16}}>
                   <div className="form-title">{editingRule ? "✏️ 항목 편집" : "➕ 새 항목 추가"}</div>
@@ -904,13 +947,14 @@ export default function App() {
                   <div className="frow"><label>제목</label><input placeholder="예: 게임 방식" value={ruleForm.title} onChange={e=>setRuleForm(p=>({...p,title:e.target.value}))}/></div>
                   <div className="frow"><label>내용</label><textarea rows={3} placeholder="내용을 입력하세요" value={ruleForm.content} onChange={e=>setRuleForm(p=>({...p,content:e.target.value}))}/></div>
                   <div className="fbtns">
-                    <button className="btn-ac" onClick={()=>{
+                    <button className="btn-ac" onClick={async ()=>{
                       if (!ruleForm.title || !ruleForm.content) return;
                       if (editingRule) {
-                        setRules(prev=>prev.map(r=>r.id===editingRule?{...r,...ruleForm}:r));
+                        await supabase.from("rules").update({ icon: ruleForm.icon, title: ruleForm.title, content: ruleForm.content }).eq("id", editingRule);
                       } else {
-                        setRules(prev=>[...prev,{id:`r${Date.now()}`,...ruleForm}]);
+                        await supabase.from("rules").insert({ icon: ruleForm.icon, title: ruleForm.title, content: ruleForm.content, order_index: rules.length });
                       }
+                      await loadRules();
                       setShowRuleForm(false); setEditingRule(null);
                     }}>저장</button>
                     <button className="btn-ghost" onClick={()=>{setShowRuleForm(false);setEditingRule(null);}}>취소</button>
@@ -918,7 +962,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* 규칙 카드 목록 */}
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {rules.map(r=>(
                   <div key={r.id} style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden"}}>
@@ -934,7 +977,7 @@ export default function App() {
                             style={{background:"rgba(79,124,255,0.1)",border:"1px solid rgba(79,124,255,0.25)",color:"var(--ac)",borderRadius:8,padding:"4px 8px",cursor:"pointer",display:"flex",alignItems:"center"}}>
                             <Ic n="edit2" s={13}/>
                           </button>
-                          <button onClick={()=>setRules(prev=>prev.filter(x=>x.id!==r.id))}
+                          <button onClick={async ()=>{ await supabase.from("rules").delete().eq("id", r.id); await loadRules(); }}
                             style={{background:"rgba(255,79,107,0.1)",border:"1px solid rgba(255,79,107,0.25)",color:"var(--rd)",borderRadius:8,padding:"4px 8px",cursor:"pointer",display:"flex",alignItems:"center"}}>
                             <Ic n="trash" s={13}/>
                           </button>
@@ -1023,19 +1066,64 @@ export default function App() {
             );
             return (
               <>
-                {/* 프로필 카드 */}
-                <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",padding:"24px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:16}}>
-                  <div style={{fontSize:52,lineHeight:1}}>{user.avatar}</div>
-                  <div>
-                    <div style={{fontSize:20,fontWeight:900}}>{user.name}</div>
-                    <div style={{fontSize:12,color:"var(--mu)",marginTop:4}}>
-                      {user.role === "admin" ? "👑 관리자" : "⚽ 멤버"}
-                      {user.joinedAt && <span style={{marginLeft:10}}>가입일 {user.joinedAt}</span>}
+                <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",padding:"24px 20px",marginBottom:16}}>
+                  {!editingProfile ? (
+                    <div style={{display:"flex",alignItems:"center",gap:16}}>
+                      <div style={{fontSize:52,lineHeight:1}}>{user.avatar}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:20,fontWeight:900}}>{user.name}</div>
+                        <div style={{fontSize:12,color:"var(--mu)",marginTop:4}}>
+                          {user.role === "admin" ? "👑 관리자" : "⚽ 멤버"}
+                          {user.joinedAt && <span style={{marginLeft:10}}>가입일 {user.joinedAt}</span>}
+                        </div>
+                        {user.nickname && <div style={{fontSize:13,color:"var(--ac)",marginTop:4}}>닉네임: {user.nickname}</div>}
+                        {user.birthday && <div style={{fontSize:12,color:"var(--mu)",marginTop:2}}>생년월일: {user.birthday}</div>}
+                      </div>
+                      <button className="ibtn" onClick={()=>{ setEditName(user.name); setEditNickname(user.nickname||""); setEditBirthday(user.birthday||""); setEditAvatar(user.avatar); setEditPw(""); setEditPw2(""); setProfileErr(""); setProfileSuc(""); setEditingProfile(true); }} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",fontSize:12,fontWeight:600}}>
+                        <Ic n="edit2" s={14}/> 편집
+                      </button>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,marginBottom:14}}>프로필 편집</div>
+                      <div style={{marginBottom:12}}>
+                        <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>아바타</div>
+                        <div className="avatar-grid">
+                          {AVATARS.map(a => (
+                            <button key={a} className={`avatar-btn${editAvatar===a?" sel":""}`} onClick={()=>setEditAvatar(a)}>{a}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>이름</div>
+                        <input style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editName} onChange={e=>setEditName(e.target.value)} placeholder="이름"/>
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>닉네임 (선택)</div>
+                        <input style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editNickname} onChange={e=>setEditNickname(e.target.value)} placeholder="닉네임"/>
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>생년월일 (선택)</div>
+                        <input type="date" style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editBirthday} onChange={e=>setEditBirthday(e.target.value)}/>
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>새 비밀번호 (변경 시에만 입력)</div>
+                        <input type="password" style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editPw} onChange={e=>setEditPw(e.target.value)} placeholder="새 비밀번호"/>
+                      </div>
+                      <div style={{marginBottom:14}}>
+                        <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>비밀번호 확인</div>
+                        <input type="password" style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editPw2} onChange={e=>setEditPw2(e.target.value)} placeholder="비밀번호 확인"/>
+                      </div>
+                      {profileErr && <div className="err" style={{marginBottom:8}}>{profileErr}</div>}
+                      {profileSuc && <div className="suc" style={{marginBottom:8}}>{profileSuc}</div>}
+                      <div style={{display:"flex",gap:8}}>
+                        <button className="btn-primary" style={{flex:1,margin:0}} onClick={saveProfile}>저장</button>
+                        <button style={{background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:12,padding:"12px 18px",color:"var(--mu)",fontFamily:"inherit",fontSize:14,fontWeight:600,cursor:"pointer"}} onClick={()=>setEditingProfile(false)}>취소</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* 스탯 요약 */}
                 <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
                   {statBox("출전", played.length, "var(--ac)")}
                   {statBox("총 게임", totalGames, "var(--yw)")}
@@ -1043,7 +1131,6 @@ export default function App() {
                   {statBox("전체 평균", avgScore, "var(--ac2)")}
                 </div>
 
-                {/* 출결 현황 */}
                 <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden",marginBottom:16}}>
                   <div style={{padding:"14px 18px",borderBottom:"1px solid var(--bd)",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:8}}>
                     <Ic n="users" s={15}/>출결 현황
@@ -1078,7 +1165,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 스코어카드 테이블 */}
                 <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden"}}>
                   <div style={{padding:"14px 18px",borderBottom:"1px solid var(--bd)",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:8}}>
                     <Ic n="trophy" s={15}/>스코어카드 <span style={{fontSize:11,color:"var(--mu)",fontWeight:400,marginLeft:4}}>참가한 경기에 점수를 입력하세요</span>
@@ -1092,6 +1178,7 @@ export default function App() {
                         {[1,2,3,4,5].map(i=>(
                           <th key={i} style={{padding:"10px 8px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>G{i}</th>
                         ))}
+                        <th style={{padding:"10px 10px",fontSize:11,color:"var(--gn)",textAlign:"center",fontWeight:600}}>토탈</th>
                         <th style={{padding:"10px 10px",fontSize:11,color:"var(--yw)",textAlign:"center",fontWeight:600}}>평균</th>
                         <th style={{padding:"10px 10px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}></th>
                       </tr>
@@ -1107,6 +1194,7 @@ export default function App() {
                           return v !== undefined ? v : (saved[i-1] !== null && saved[i-1] !== undefined ? String(saved[i-1]) : "");
                         });
                         const validScores = rowScores.filter(v => v !== "" && !isNaN(parseInt(v))).map(Number);
+                        const rowTotal = validScores.length > 0 ? validScores.reduce((a,b)=>a+b,0) : "—";
                         const rowAvg = validScores.length > 0 ? (validScores.reduce((a,b)=>a+b,0)/validScores.length).toFixed(1) : "—";
                         return (
                           <tr key={s.id} style={{borderTop:"1px solid var(--bd)"}}>
@@ -1128,6 +1216,7 @@ export default function App() {
                                   : <span style={{color:"var(--mu)",fontSize:12}}>—</span>}
                               </td>
                             ))}
+                            <td style={{padding:"8px 10px",textAlign:"center",fontSize:13,fontWeight:800,color:"var(--gn)"}}>{s.status==="join"?rowTotal:"—"}</td>
                             <td style={{padding:"8px 10px",textAlign:"center",fontSize:13,fontWeight:800,color:"var(--yw)"}}>{s.status==="join"?rowAvg:"—"}</td>
                             <td style={{padding:"6px 10px",textAlign:"center"}}>
                               {s.status==="join" && (
@@ -1141,7 +1230,7 @@ export default function App() {
                         );
                       })}
                       {mySessions.length === 0 && (
-                        <tr><td colSpan={9} style={{padding:"32px",textAlign:"center",color:"var(--mu)",fontSize:13}}>아직 리그전이 없습니다</td></tr>
+                        <tr><td colSpan={10} style={{padding:"32px",textAlign:"center",color:"var(--mu)",fontSize:13}}>아직 리그전이 없습니다</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1177,7 +1266,6 @@ export default function App() {
                   <span style={{fontSize:12,color:"var(--mu)",fontWeight:400}}>전체 {users.length}명</span>
                 </div>
 
-                {/* 1위 하이라이트 */}
                 {rankData[0]?.totalGames > 0 && (
                   <div style={{background:"linear-gradient(135deg,rgba(245,197,66,0.12),rgba(79,124,255,0.08))",border:"1px solid rgba(245,197,66,0.3)",borderRadius:"var(--r)",padding:"20px 24px",marginBottom:16,display:"flex",alignItems:"center",gap:16}}>
                     <div style={{fontSize:48,lineHeight:1}}>{rankData[0].avatar}</div>
@@ -1194,7 +1282,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 전체 순위표 */}
                 <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden"}}>
                   <table style={{width:"100%",borderCollapse:"collapse"}}>
                     <thead>
@@ -1204,6 +1291,7 @@ export default function App() {
                         <th style={{padding:"11px 12px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>출전</th>
                         <th style={{padding:"11px 12px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>게임</th>
                         <th style={{padding:"11px 12px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>최고</th>
+                        <th style={{padding:"11px 12px",fontSize:11,color:"var(--gn)",textAlign:"center",fontWeight:600}}>토탈</th>
                         <th style={{padding:"11px 16px",fontSize:11,color:"var(--yw)",textAlign:"center",fontWeight:700}}>아베</th>
                       </tr>
                     </thead>
@@ -1222,6 +1310,7 @@ export default function App() {
                             <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,color:"var(--mu)"}}>{u.attended}</td>
                             <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,color:"var(--mu)"}}>{u.totalGames}</td>
                             <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,fontWeight:600,color:u.best>0?"var(--gn)":"var(--mu)"}}>{u.best>0?u.best:"—"}</td>
+                            <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,fontWeight:700,color:u.totalScore>0?"var(--gn)":"var(--mu)"}}>{u.totalScore>0?u.totalScore:"—"}</td>
                             <td style={{padding:"12px 16px",textAlign:"center",fontSize:18,fontWeight:900,color:u.avg>0?"var(--yw)":"var(--mu)"}}>{u.avg>0?u.avg.toFixed(1):"—"}</td>
                           </tr>
                         );
@@ -1258,11 +1347,11 @@ export default function App() {
                     <div className="frow"><label>제목 *</label><input placeholder="공지 제목" value={annoForm.title} onChange={e=>setAnnoForm(p=>({...p,title:e.target.value}))}/></div>
                     <div className="frow"><label>내용 *</label><textarea rows={3} placeholder="공지 내용을 입력하세요" value={annoForm.content} onChange={e=>setAnnoForm(p=>({...p,content:e.target.value}))}/></div>
                     <div className="fbtns">
-                      <button className="btn-ac" onClick={()=>{
+                      <button className="btn-ac" onClick={async ()=>{
                         if (!annoForm.title.trim() || !annoForm.content.trim()) return;
-                        const now = new Date(); const p2 = n=>String(n).padStart(2,"0");
-                        setAnnouncements(prev=>[{id:`a${Date.now()}`,title:annoForm.title.trim(),content:annoForm.content.trim(),date:`${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`},...prev]);
-                        setAnnoForm({title:"",content:""});setShowAnnoForm(false);
+                        await supabase.from("announcements").insert({ title: annoForm.title.trim(), content: annoForm.content.trim() });
+                        setAnnoForm({title:"",content:""}); setShowAnnoForm(false);
+                        await loadAnnouncements();
                       }}>등록</button>
                       <button className="btn-ghost" onClick={()=>{setShowAnnoForm(false);setAnnoForm({title:"",content:""});}}>취소</button>
                     </div>
@@ -1277,7 +1366,7 @@ export default function App() {
                           <div style={{fontSize:12,color:"#b0a880",marginTop:3,whiteSpace:"pre-wrap"}}>{a.content}</div>
                           <div style={{fontSize:10,color:"var(--mu)",marginTop:4}}>{a.date}</div>
                         </div>
-                        <button onClick={()=>setAnnouncements(prev=>prev.filter(x=>x.id!==a.id))}
+                        <button onClick={async ()=>{ await supabase.from("announcements").delete().eq("id", a.id); await loadAnnouncements(); }}
                           style={{background:"none",border:"none",color:"var(--mu)",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",padding:4}}>
                           <Ic n="trash" s={14}/>
                         </button>
@@ -1333,18 +1422,54 @@ export default function App() {
               <div className="section-label">MEMBER LIST ({members.length}명)</div>
               <div className="member-list">
                 {members.length === 0 && <div style={{color:"var(--mu)",fontSize:13,padding:"12px 0"}}>아직 가입한 멤버가 없습니다.</div>}
-                {members.map(m=>(
-                  <div className="member-row" key={m.id}>
-                    <div className="member-info">
-                      <div className="member-av">{m.avatar}</div>
-                      <div>
-                        <div className="member-name">{m.name}</div>
-                        <div className="member-joined">가입일: {m.joinedAt || "—"}</div>
+                {members.map(m => {
+                  const mySessions = sessions.map(s => ({ status: s.participants[m.id] }));
+                  const joinCount = mySessions.filter(s => s.status === "join").length;
+                  const skipCount = mySessions.filter(s => s.status === "skip").length;
+                  const isConfirming = confirmDeleteUserId === m.id;
+                  return (
+                    <div className="member-row" key={m.id}>
+                      <div className="member-row-top">
+                        <div className="member-info">
+                          <div className="member-av">{m.avatar}</div>
+                          <div style={{minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                              <span className="member-name">{m.name}</span>
+                              {m.nickname && <span style={{fontSize:12,color:"var(--ac)",fontWeight:600}}>「{m.nickname}」</span>}
+                            </div>
+                            <div className="member-meta">
+                              <span>📅 가입 {m.joinedAt || "—"}</span>
+                              {m.birthday && <span>🎂 {m.birthday}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {isConfirming ? (
+                          <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                            <span style={{fontSize:11,color:"var(--rd)",fontWeight:700,whiteSpace:"nowrap"}}>정말요?</span>
+                            <button onClick={async ()=>{ await deleteUser(m.id); setConfirmDeleteUserId(null); }}
+                              style={{background:"var(--rd)",border:"none",color:"#fff",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>확인</button>
+                            <button onClick={()=>setConfirmDeleteUserId(null)}
+                              style={{background:"var(--s2)",border:"1px solid var(--bd)",color:"var(--mu)",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>취소</button>
+                          </div>
+                        ) : (
+                          <button className="del-btn" onClick={()=>setConfirmDeleteUserId(m.id)}><Ic n="trash" s={13}/>삭제</button>
+                        )}
+                      </div>
+                      <div className="member-extra">
+                        <div className="member-tag">출전 <b style={{color:"var(--gn)"}}>{joinCount}회</b></div>
+                        <div className="member-tag">불참 <b style={{color:"var(--rd)"}}>{skipCount}회</b></div>
+                        <div className="member-tag">미응답 <b>{sessions.length - joinCount - skipCount}회</b></div>
+                        {m.birthday && (() => {
+                          const today = new Date();
+                          const bday = new Date(m.birthday);
+                          const thisYear = new Date(today.getFullYear(), bday.getMonth(), bday.getDate());
+                          const diff = Math.floor((today - new Date(m.birthday)) / (365.25 * 24 * 3600 * 1000));
+                          return <div className="member-tag">나이 <b>{diff}세</b></div>;
+                        })()}
                       </div>
                     </div>
-                    <button className="del-btn" onClick={()=>deleteUser(m.id)}><Ic n="trash" s={13}/>삭제</button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="section-label">출결 현황 / 참가비 설정</div>
@@ -1354,7 +1479,6 @@ export default function App() {
                 const isExp = expanded===s.id;
                 return (
                   <div className="acard" key={s.id}>
-                    {/* 항상 보이는 헤더 */}
                     <div style={{padding:"14px 18px",borderBottom:"1px solid var(--bd)"}}>
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1381,7 +1505,6 @@ export default function App() {
                           }
                         </div>
                       </div>
-                      {/* 참가비 입력 — 항상 표시 */}
                       <div style={{display:"flex",alignItems:"center",gap:8,background:"rgba(245,197,66,0.06)",border:"1px solid rgba(245,197,66,0.2)",borderRadius:10,padding:"10px 14px"}}>
                         <span style={{fontSize:18}}>💰</span>
                         <span style={{fontSize:12,color:"var(--mu)",fontWeight:600,whiteSpace:"nowrap"}}>참가비</span>
@@ -1408,7 +1531,7 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    {/* 🎳 스코어 입력 — 항상 표시 */}
+                    {/* 🎳 스코어 입력 */}
                     <div style={{borderTop:"1px solid var(--bd)",padding:"14px 18px"}}>
                       <div style={{fontSize:12,color:"var(--tx)",fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
                         🎳 스코어 입력
@@ -1449,7 +1572,7 @@ export default function App() {
                       })}
                     </div>
 
-                    {/* 출결 목록 — 클릭으로 펼침 */}
+                    {/* 출결 명단 */}
                     <div className="acard-hdr" onClick={()=>setExpanded(isExp?null:s.id)} style={{padding:"10px 18px",borderTop:"1px solid var(--bd)"}}>
                       <span style={{fontSize:12,color:"var(--mu)",fontWeight:600}}>출결 명단 보기</span>
                       {chev(isExp)}
