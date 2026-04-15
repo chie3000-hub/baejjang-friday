@@ -771,7 +771,6 @@ export default function App() {
     { id:"rules",    label:"규칙/방법",  icon:"book" },
     { id:"board",    label:"자유게시판",icon:"msg" },
     { id:"mypage",   label:"내 정보",   icon:"trophy" },
-    { id:"average",  label:"아베 표",   icon:"users"  },
     ...(isAdmin ? [{ id:"admin", label:"관리", icon:"admin" }] : []),
   ];
 
@@ -1281,97 +1280,86 @@ export default function App() {
             );
           })()}
 
-          {/* ── 아베 표 ── */}
-          {tab==="average" && (() => {
-            const rankData = users.map(u => {
-              const allScores = sessions.flatMap(s => {
-                if (s.participants[u.id] !== "join") return [];
-                const games = ((s.scores || {})[u.id] || {}).games || [];
-                return games.filter(g => g !== null && g !== undefined && g >= 0);
-              });
-              const totalGames = allScores.length;
-              const totalScore = allScores.reduce((a,b) => a+b, 0);
-              const avg = totalGames > 0 ? totalScore / totalGames : 0;
-              const best = totalGames > 0 ? Math.max(...allScores) : 0;
-              const attended = sessions.filter(s => s.participants[u.id] === "join").length;
-              return { ...u, totalGames, totalScore, avg, best, attended };
-            }).sort((a,b) => b.avg - a.avg || b.totalGames - a.totalGames);
-
-            const medalColor = i => i===0?"var(--yw)":i===1?"#c0c8e0":i===2?"#cd7f32":"var(--mu)";
-            const medal = i => i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}`;
-
-            return (
-              <>
-                <div style={{fontSize:17,fontWeight:800,marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
-                  🎳 아베 표
-                  <span style={{fontSize:12,color:"var(--mu)",fontWeight:400}}>전체 {users.length}명</span>
-                </div>
-
-                {rankData[0]?.totalGames > 0 && (
-                  <div style={{background:"linear-gradient(135deg,rgba(245,197,66,0.12),rgba(79,124,255,0.08))",border:"1px solid rgba(245,197,66,0.3)",borderRadius:"var(--r)",padding:"20px 24px",marginBottom:16,display:"flex",alignItems:"center",gap:16}}>
-                    <div style={{fontSize:48,lineHeight:1}}>{rankData[0].avatar}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:11,color:"var(--yw)",fontWeight:700,letterSpacing:"0.08em",marginBottom:4}}>🥇 현재 1위</div>
-                      <div style={{fontSize:20,fontWeight:900}}>{rankData[0].name}</div>
-                      <div style={{fontSize:12,color:"var(--mu)",marginTop:4}}>{rankData[0].attended}회 출전 · {rankData[0].totalGames}게임</div>
-                    </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:11,color:"var(--mu)",marginBottom:2}}>아베레이지</div>
-                      <div style={{fontSize:36,fontWeight:900,color:"var(--yw)",lineHeight:1}}>{rankData[0].avg.toFixed(1)}</div>
-                      <div style={{fontSize:11,color:"var(--mu)",marginTop:4}}>최고 {rankData[0].best}점</div>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse"}}>
-                    <thead>
-                      <tr style={{background:"var(--s2)"}}>
-                        <th style={{padding:"11px 16px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600,width:40}}>#</th>
-                        <th style={{padding:"11px 16px",fontSize:11,color:"var(--mu)",textAlign:"left",fontWeight:600}}>멤버</th>
-                        <th style={{padding:"11px 12px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>출전</th>
-                        <th style={{padding:"11px 12px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>게임</th>
-                        <th style={{padding:"11px 12px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>최고</th>
-                        <th style={{padding:"11px 12px",fontSize:11,color:"var(--gn)",textAlign:"center",fontWeight:600}}>토탈</th>
-                        <th style={{padding:"11px 16px",fontSize:11,color:"var(--yw)",textAlign:"center",fontWeight:700}}>아베</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankData.map((u,i) => {
-                        const isMe = u.id === user.id;
-                        return (
-                          <tr key={u.id} style={{borderTop:"1px solid var(--bd)",background:isMe?"rgba(79,124,255,0.05)":"transparent"}}>
-                            <td style={{padding:"12px 16px",textAlign:"center",fontSize:16,fontWeight:900,color:medalColor(i)}}>{medal(i)}</td>
-                            <td style={{padding:"12px 16px"}}>
-                              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                                <span style={{fontSize:20}}>{u.avatar}</span>
-                                <span style={{fontSize:14,fontWeight:isMe?700:500,color:isMe?"var(--ac)":"var(--tx)"}}>{u.name}{isMe&&<span style={{fontSize:10,color:"var(--ac)",marginLeft:4}}>나</span>}</span>
-                              </div>
-                            </td>
-                            <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,color:"var(--mu)"}}>{u.attended}</td>
-                            <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,color:"var(--mu)"}}>{u.totalGames}</td>
-                            <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,fontWeight:600,color:u.best>0?"var(--gn)":"var(--mu)"}}>{u.best>0?u.best:"—"}</td>
-                            <td style={{padding:"12px 12px",textAlign:"center",fontSize:13,fontWeight:700,color:u.totalScore>0?"var(--gn)":"var(--mu)"}}>{u.totalScore>0?u.totalScore:"—"}</td>
-                            <td style={{padding:"12px 16px",textAlign:"center",fontSize:18,fontWeight:900,color:u.avg>0?"var(--yw)":"var(--mu)"}}>{u.avg>0?u.avg.toFixed(1):"—"}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {rankData.every(u=>u.totalGames===0) && (
-                  <div style={{textAlign:"center",padding:"32px 0",color:"var(--mu)",fontSize:13,marginTop:8}}>
-                    아직 입력된 스코어가 없습니다
-                  </div>
-                )}
-              </>
-            );
-          })()}
-
           {/* ── 관리자 ── */}
           {tab==="admin" && isAdmin && (
             <>
+              {/* ── 아베 표 ── */}
+              {(() => {
+                const rankData = users.map(u => {
+                  const allScores = sessions.flatMap(s => {
+                    if (s.participants[u.id] !== "join") return [];
+                    const games = ((s.scores || {})[u.id] || {}).games || [];
+                    return games.filter(g => g !== null && g !== undefined && g >= 0);
+                  });
+                  const totalGames = allScores.length;
+                  const totalScore = allScores.reduce((a,b) => a+b, 0);
+                  const avg = totalGames > 0 ? totalScore / totalGames : 0;
+                  const best = totalGames > 0 ? Math.max(...allScores) : 0;
+                  const attended = sessions.filter(s => s.participants[u.id] === "join").length;
+                  return { ...u, totalGames, totalScore, avg, best, attended };
+                }).sort((a,b) => b.avg - a.avg || b.totalGames - a.totalGames);
+                const medalColor = i => i===0?"var(--yw)":i===1?"#c0c8e0":i===2?"#cd7f32":"var(--mu)";
+                const medal = i => i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}`;
+                return (
+                  <div style={{marginBottom:24}}>
+                    <div style={{fontSize:13,fontWeight:700,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                      🎳 아베 표 <span style={{fontSize:11,color:"var(--mu)",fontWeight:400}}>전체 {users.length}명</span>
+                    </div>
+                    {rankData[0]?.totalGames > 0 && (
+                      <div style={{background:"linear-gradient(135deg,rgba(245,197,66,0.12),rgba(79,124,255,0.08))",border:"1px solid rgba(245,197,66,0.3)",borderRadius:"var(--r)",padding:"16px 20px",marginBottom:10,display:"flex",alignItems:"center",gap:16}}>
+                        <div style={{fontSize:40,lineHeight:1}}>{rankData[0].avatar}</div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:11,color:"var(--yw)",fontWeight:700,marginBottom:2}}>🥇 현재 1위</div>
+                          <div style={{fontSize:17,fontWeight:900}}>{rankData[0].name}</div>
+                          <div style={{fontSize:11,color:"var(--mu)",marginTop:2}}>{rankData[0].attended}회 출전 · {rankData[0].totalGames}게임</div>
+                        </div>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:11,color:"var(--mu)",marginBottom:2}}>아베레이지</div>
+                          <div style={{fontSize:30,fontWeight:900,color:"var(--yw)",lineHeight:1}}>{rankData[0].avg.toFixed(1)}</div>
+                          <div style={{fontSize:11,color:"var(--mu)",marginTop:2}}>최고 {rankData[0].best}점</div>
+                        </div>
+                      </div>
+                    )}
+                    <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse"}}>
+                        <thead>
+                          <tr style={{background:"var(--s2)"}}>
+                            <th style={{padding:"10px 14px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600,width:36}}>#</th>
+                            <th style={{padding:"10px 14px",fontSize:11,color:"var(--mu)",textAlign:"left",fontWeight:600}}>멤버</th>
+                            <th style={{padding:"10px 10px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>출전</th>
+                            <th style={{padding:"10px 10px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>게임</th>
+                            <th style={{padding:"10px 10px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>최고</th>
+                            <th style={{padding:"10px 10px",fontSize:11,color:"var(--gn)",textAlign:"center",fontWeight:600}}>토탈</th>
+                            <th style={{padding:"10px 14px",fontSize:11,color:"var(--yw)",textAlign:"center",fontWeight:700}}>아베</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rankData.map((u,i) => (
+                            <tr key={u.id} style={{borderTop:"1px solid var(--bd)"}}>
+                              <td style={{padding:"10px 14px",textAlign:"center",fontSize:15,fontWeight:900,color:medalColor(i)}}>{medal(i)}</td>
+                              <td style={{padding:"10px 14px"}}>
+                                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                  <span style={{fontSize:18}}>{u.avatar}</span>
+                                  <span style={{fontSize:13,fontWeight:500}}>{u.name}</span>
+                                </div>
+                              </td>
+                              <td style={{padding:"10px 10px",textAlign:"center",fontSize:12,color:"var(--mu)"}}>{u.attended}</td>
+                              <td style={{padding:"10px 10px",textAlign:"center",fontSize:12,color:"var(--mu)"}}>{u.totalGames}</td>
+                              <td style={{padding:"10px 10px",textAlign:"center",fontSize:12,fontWeight:600,color:u.best>0?"var(--gn)":"var(--mu)"}}>{u.best>0?u.best:"—"}</td>
+                              <td style={{padding:"10px 10px",textAlign:"center",fontSize:12,fontWeight:700,color:u.totalScore>0?"var(--gn)":"var(--mu)"}}>{u.totalScore>0?u.totalScore:"—"}</td>
+                              <td style={{padding:"10px 14px",textAlign:"center",fontSize:17,fontWeight:900,color:u.avg>0?"var(--yw)":"var(--mu)"}}>{u.avg>0?u.avg.toFixed(1):"—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {rankData.every(u=>u.totalGames===0) && (
+                      <div style={{textAlign:"center",padding:"20px 0",color:"var(--mu)",fontSize:12}}>아직 입력된 스코어가 없습니다</div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* ── 상품 관리 ── */}
               <div style={{marginBottom:24}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
