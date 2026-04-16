@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./src/supabase.js";
 
+// ── 관리자 고정 인증 정보 ────────────────────────────────────────────────────
+const ADMIN_NAME = "관리자";
+const ADMIN_PW   = "관리자";
+
 // ── 아바타 선택지 ──────────────────────────────────────────────────────────
 const AVATARS = [
   // 볼링 & 스포츠
@@ -501,9 +505,23 @@ export default function App() {
   // ── Auth ──
   const handleLogin = async () => {
     setLErr("");
-    const { data } = await supabase.from("users")
-      .select("id, name, nickname, birthday, role, avatar, joined_at")
-      .eq("name", lName).eq("password", lPw).maybeSingle();
+    let data = null;
+
+    if (lName.trim() === ADMIN_NAME) {
+      // 관리자: 고정 비밀번호로만 인증
+      if (lPw !== ADMIN_PW) return setLErr("이름 또는 비밀번호가 틀렸습니다.");
+      const { data: d } = await supabase.from("users")
+        .select("id, name, nickname, birthday, role, avatar, joined_at")
+        .eq("name", ADMIN_NAME).maybeSingle();
+      data = d;
+    } else {
+      // 일반 회원: DB 비밀번호로 인증
+      const { data: d } = await supabase.from("users")
+        .select("id, name, nickname, birthday, role, avatar, joined_at")
+        .eq("name", lName).eq("password", lPw).maybeSingle();
+      data = d;
+    }
+
     if (data) {
       const u = { id: data.id, name: data.name, nickname: data.nickname || "", birthday: data.birthday || "", role: data.role, avatar: data.avatar, joinedAt: data.joined_at };
       if (rememberMe) {
@@ -1134,10 +1152,12 @@ export default function App() {
                           ))}
                         </div>
                       </div>
-                      <div style={{marginBottom:10}}>
-                        <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>이름</div>
-                        <input style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editName} onChange={e=>setEditName(e.target.value)} placeholder="이름"/>
-                      </div>
+                      {user.role !== "admin" && (
+                        <div style={{marginBottom:10}}>
+                          <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>이름</div>
+                          <input style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editName} onChange={e=>setEditName(e.target.value)} placeholder="이름"/>
+                        </div>
+                      )}
                       <div style={{marginBottom:10}}>
                         <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>닉네임 (선택)</div>
                         <input style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editNickname} onChange={e=>setEditNickname(e.target.value)} placeholder="닉네임"/>
@@ -1146,14 +1166,18 @@ export default function App() {
                         <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>생년월일 (선택)</div>
                         <input type="date" style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editBirthday} onChange={e=>setEditBirthday(e.target.value)}/>
                       </div>
-                      <div style={{marginBottom:10}}>
-                        <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>새 비밀번호 (변경 시에만 입력)</div>
-                        <input type="password" style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editPw} onChange={e=>setEditPw(e.target.value)} placeholder="새 비밀번호"/>
-                      </div>
-                      <div style={{marginBottom:14}}>
-                        <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>비밀번호 확인</div>
-                        <input type="password" style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editPw2} onChange={e=>setEditPw2(e.target.value)} placeholder="비밀번호 확인"/>
-                      </div>
+                      {user.role !== "admin" && (
+                        <>
+                          <div style={{marginBottom:10}}>
+                            <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>새 비밀번호 (변경 시에만 입력)</div>
+                            <input type="password" style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editPw} onChange={e=>setEditPw(e.target.value)} placeholder="새 비밀번호"/>
+                          </div>
+                          <div style={{marginBottom:14}}>
+                            <div style={{fontSize:11,color:"var(--mu)",marginBottom:6,fontWeight:600}}>비밀번호 확인</div>
+                            <input type="password" style={{width:"100%",background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:10,padding:"10px 12px",color:"var(--tx)",fontSize:14,fontFamily:"inherit",outline:"none"}} value={editPw2} onChange={e=>setEditPw2(e.target.value)} placeholder="비밀번호 확인"/>
+                          </div>
+                        </>
+                      )}
                       {profileErr && <div className="err" style={{marginBottom:8}}>{profileErr}</div>}
                       {profileSuc && <div className="suc" style={{marginBottom:8}}>{profileSuc}</div>}
                       <div style={{display:"flex",gap:8}}>
