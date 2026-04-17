@@ -1188,11 +1188,10 @@ export default function App() {
                   )}
                 </div>
 
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
                   {statBox("출전", played.length, "var(--ac)")}
                   {statBox("총 게임", totalGames, "var(--yw)")}
                   {statBox("최고 점수", bestScore, "var(--gn)")}
-                  {statBox("전체 평균", avgScore, "var(--ac2)")}
                 </div>
 
                 <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden",marginBottom:16}}>
@@ -1243,7 +1242,6 @@ export default function App() {
                           <th key={i} style={{padding:"10px 8px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}>G{i}</th>
                         ))}
                         <th style={{padding:"10px 10px",fontSize:11,color:"var(--gn)",textAlign:"center",fontWeight:600}}>토탈</th>
-                        <th style={{padding:"10px 10px",fontSize:11,color:"var(--yw)",textAlign:"center",fontWeight:600}}>평균</th>
                         <th style={{padding:"10px 10px",fontSize:11,color:"var(--mu)",textAlign:"center",fontWeight:600}}></th>
                       </tr>
                     </thead>
@@ -1281,7 +1279,6 @@ export default function App() {
                               </td>
                             ))}
                             <td style={{padding:"8px 10px",textAlign:"center",fontSize:13,fontWeight:800,color:"var(--gn)"}}>{s.status==="join"?rowTotal:"—"}</td>
-                            <td style={{padding:"8px 10px",textAlign:"center",fontSize:13,fontWeight:800,color:"var(--yw)"}}>{s.status==="join"?rowAvg:"—"}</td>
                             <td style={{padding:"6px 10px",textAlign:"center"}}>
                               {s.status==="join" && (
                                 <button onClick={()=>saveScore(s.id,user.id)}
