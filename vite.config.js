@@ -33,6 +33,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         // アプリシェル（HTML/JS/CSS）はキャッシュ優先
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         // Supabase APIはネットワーク優先（リアルタイムデータ）
