@@ -35,23 +35,13 @@ export default defineConfig({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        // アプリシェル（HTML/JS/CSS）はキャッシュ優先
-        globPatterns: ["**/*.{js,css,ico,png,svg}"],
+        // プリキャッシュなし → 常にネットワークから最新版を取得
+        globPatterns: [],
         runtimeCaching: [
           {
-            // HTMLは常にネットワーク最新版を取得（キャッシュ古い問題を防ぐ）
-            urlPattern: /\.html$/,
+            urlPattern: /^https?:\/\/.*/,
             handler: "NetworkFirst",
-            options: { cacheName: "html-cache", networkTimeoutSeconds: 5 },
-          },
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "supabase-cache",
-              networkTimeoutSeconds: 10,
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
-            },
+            options: { cacheName: "network-first", networkTimeoutSeconds: 5 },
           },
         ],
       },
