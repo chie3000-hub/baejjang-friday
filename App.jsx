@@ -1115,7 +1115,6 @@ export default function App() {
             const allScores = played.flatMap(s => (s.myScore.games || []).filter(g => g !== null && g !== undefined));
             const totalGames = allScores.length;
             const bestScore = totalGames > 0 ? Math.max(...allScores) : "—";
-            const avgScore = totalGames > 0 ? (allScores.reduce((a,b) => a+b, 0) / totalGames).toFixed(1) : "0.0";
             const statBox = (label, val, color) => (
               <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",padding:"16px",textAlign:"center"}}>
                 <div style={{fontSize:11,color:"var(--mu)",marginBottom:8,fontWeight:600}}>{label}</div>
@@ -1257,7 +1256,6 @@ export default function App() {
                         });
                         const validScores = rowScores.filter(v => v !== "" && !isNaN(parseInt(v))).map(Number);
                         const rowTotal = validScores.length > 0 ? validScores.reduce((a,b)=>a+b,0) : "—";
-                        const rowAvg = validScores.length > 0 ? (validScores.reduce((a,b)=>a+b,0)/validScores.length).toFixed(1) : "—";
                         return (
                           <tr key={s.id} style={{borderTop:"1px solid var(--bd)"}}>
                             <td style={{padding:"8px 14px",fontSize:12}}>
