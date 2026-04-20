@@ -512,6 +512,17 @@ export default function App() {
   }, [loadSessions]);
 
   // ── Auth ──
+  const handleAdminLogin = async () => {
+    setLErr("");
+    const { data: d } = await supabase.from("users")
+      .select("id, name, nickname, birthday, role, avatar, joined_at")
+      .eq("name", ADMIN_NAME).maybeSingle();
+    const data = d || { id: 0, name: ADMIN_NAME, nickname: "", birthday: "", role: "admin", avatar: "👑", joined_at: null };
+    const u = { id: data.id, name: data.name, nickname: data.nickname || "", birthday: data.birthday || "", role: data.role, avatar: data.avatar, joinedAt: data.joined_at };
+    localStorage.setItem("bjf_session", JSON.stringify(u));
+    setUser(u);
+  };
+
   const handleLogin = async () => {
     setLErr("");
     let data = null;
@@ -769,7 +780,7 @@ export default function App() {
               </div>
               <button className="btn-primary" onClick={handleLogin}>로그인</button>
               <button
-                onClick={()=>{ setLName(ADMIN_NAME); setLPw(ADMIN_PW); setTimeout(handleLogin, 50); }}
+                onClick={handleAdminLogin}
                 style={{background:"rgba(245,197,66,0.1)",border:"1px solid rgba(245,197,66,0.3)",color:"var(--yw)",borderRadius:12,padding:"12px",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:4}}
               >👑 관리자로 로그인</button>
             </>
