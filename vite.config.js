@@ -35,7 +35,7 @@ export default defineConfig({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        // プリキャッシュなし → 常にネットワークから最新版を取得
+        cleanupOutdatedCaches: true,
         globPatterns: [],
         runtimeCaching: [
           {
