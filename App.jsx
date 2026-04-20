@@ -374,6 +374,10 @@ export default function App() {
   const [confirmDeleteUserId, setConfirmDeleteUserId] = useState(null);
   const [sessionCmtInputs, setSessionCmtInputs] = useState({});
 
+  // ── 게스트 ──
+  const [guestInputs, setGuestInputs] = useState({});
+  const [showGuestForm, setShowGuestForm] = useState({});
+
   // ── 새 리그 추가 폼 ──
   const [showAddSession, setShowAddSession] = useState(false);
   const [addSessionForm, setAddSessionForm] = useState({ date: "", note: "" });
@@ -416,6 +420,7 @@ export default function App() {
       supabase.from("scores").select("*"),
       supabase.from("session_comments").select("*, users(name, avatar)").order("created_at"),
     ]);
+    const guestRes = await supabase.from("session_guests").select("*").order("created_at");
     const list = (sessRes.data || []).map(s => {
       const parts = {};
       (partRes.data || []).filter(p => p.session_id === s.id).forEach(p => { parts[p.user_id] = p.status; });
@@ -425,7 +430,10 @@ export default function App() {
         id: c.id, author: c.users?.name || "?", avatar: c.users?.avatar || "👤",
         text: c.text, date: fmtDt(c.created_at),
       }));
-      return { id: s.id, date: new Date(s.date + "T12:00:00"), note: s.note || "", fee: s.fee || 0, participants: parts, scores: scoresMap, comments };
+      const guests = (guestRes.data || []).filter(g => g.session_id === s.id).map(g => ({
+        id: g.id, name: g.name, average: g.average, addedBy: g.added_by,
+      }));
+      return { id: s.id, date: new Date(s.date + "T12:00:00"), note: s.note || "", fee: s.fee || 0, participants: parts, scores: scoresMap, comments, guests };
     });
     setSessions(list);
   }, []);
@@ -498,6 +506,7 @@ export default function App() {
     const chan = supabase.channel("bjf-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "participants" }, loadSessions)
       .on("postgres_changes", { event: "*", schema: "public", table: "scores" }, loadSessions)
+      .on("postgres_changes", { event: "*", schema: "public", table: "session_guests" }, loadSessions)
       .subscribe();
     return () => supabase.removeChannel(chan);
   }, [loadSessions]);
@@ -641,6 +650,23 @@ export default function App() {
 
   const deleteSessionComment = async (sid, cid) => {
     await supabase.from("session_comments").delete().eq("id", cid);
+    await loadSessions();
+  };
+
+  const addGuest = async (sid) => {
+    const inp = guestInputs[sid] || {};
+    const name = (inp.name || "").trim();
+    if (!name) return showToast("게스트 이름을 입력해주세요.");
+    const average = inp.average ? parseInt(inp.average) : null;
+    const { error } = await supabase.from("session_guests").insert({ session_id: sid, name, average, added_by: user.id });
+    if (error) return showToast("게스트 추가 중 오류가 발생했습니다.");
+    setGuestInputs(prev => ({ ...prev, [sid]: { name: "", average: "" } }));
+    setShowGuestForm(prev => ({ ...prev, [sid]: false }));
+    await loadSessions();
+  };
+
+  const deleteGuest = async (gid) => {
+    await supabase.from("session_guests").delete().eq("id", gid);
     await loadSessions();
   };
 
@@ -843,7 +869,8 @@ export default function App() {
               )}
               {sessions.map((s,i) => {
                 const myStatus = s.participants[user.id];
-                const joinCount = Object.values(s.participants).filter(v=>v==="join").length;
+                const guestList = s.guests || [];
+                const joinCount = Object.values(s.participants).filter(v=>v==="join").length + guestList.length;
                 const closed = isDeadlinePassed(s.date);
                 return (
                   <div className="scard" key={s.id}>
@@ -898,6 +925,46 @@ export default function App() {
                               {u.avatar} {u.name}
                             </span>
                           ))}
+                          {guestList.map(g => (
+                            <span key={g.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:"rgba(245,197,66,0.1)",border:"1px solid rgba(245,197,66,0.3)",borderRadius:99,padding:"3px 10px",fontSize:12,color:"var(--yw)"}}>
+                              🎳 {g.name}{g.average ? ` (ave ${g.average})` : ""}
+                              {(isAdmin || g.addedBy === user.id) && (
+                                <button onClick={()=>deleteGuest(g.id)} style={{background:"none",border:"none",color:"rgba(245,197,66,0.6)",cursor:"pointer",padding:0,marginLeft:2,display:"flex",alignItems:"center"}}>
+                                  <Ic n="x" s={11}/>
+                                </button>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {/* ── 게스트 추가 ── */}
+                      {!closed && (
+                        <div style={{marginTop:10}}>
+                          {showGuestForm[s.id] ? (
+                            <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                              <input
+                                style={{flex:"1 1 100px",minWidth:80,background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:8,padding:"6px 10px",color:"var(--tx)",fontSize:12,fontFamily:"inherit",outline:"none"}}
+                                placeholder="게스트 이름"
+                                value={(guestInputs[s.id]||{}).name||""}
+                                onChange={e=>setGuestInputs(prev=>({...prev,[s.id]:{...(prev[s.id]||{}),name:e.target.value}}))}
+                                onKeyDown={e=>e.key==="Enter"&&addGuest(s.id)}
+                              />
+                              <input
+                                type="number" min="0" max="300"
+                                style={{width:70,background:"var(--s2)",border:"1px solid var(--bd)",borderRadius:8,padding:"6px 8px",color:"var(--tx)",fontSize:12,fontFamily:"inherit",outline:"none"}}
+                                placeholder="アベ"
+                                value={(guestInputs[s.id]||{}).average||""}
+                                onChange={e=>setGuestInputs(prev=>({...prev,[s.id]:{...(prev[s.id]||{}),average:e.target.value}}))}
+                                onKeyDown={e=>e.key==="Enter"&&addGuest(s.id)}
+                              />
+                              <button onClick={()=>addGuest(s.id)} style={{background:"rgba(245,197,66,0.15)",border:"1px solid rgba(245,197,66,0.35)",color:"var(--yw)",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>추가</button>
+                              <button onClick={()=>setShowGuestForm(prev=>({...prev,[s.id]:false}))} style={{background:"var(--s2)",border:"1px solid var(--bd)",color:"var(--mu)",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>취소</button>
+                            </div>
+                          ) : (
+                            <button onClick={()=>setShowGuestForm(prev=>({...prev,[s.id]:true}))} style={{background:"rgba(245,197,66,0.08)",border:"1px dashed rgba(245,197,66,0.35)",color:"var(--yw)",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:5}}>
+                              <Ic n="plus" s={11}/>게스트 추가
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
