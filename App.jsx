@@ -780,7 +780,7 @@ export default function App() {
               </div>
               <button className="btn-primary" onClick={handleLogin}>로그인</button>
               <button
-                onClick={handleAdminLogin}
+                onClick={()=>{ const pw = prompt("관리자 비밀번호를 입력하세요"); if(pw===ADMIN_PW) handleAdminLogin(); else if(pw!==null) setLErr("비밀번호가 틀렸습니다."); }}
                 style={{background:"rgba(245,197,66,0.1)",border:"1px solid rgba(245,197,66,0.3)",color:"var(--yw)",borderRadius:12,padding:"12px",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:4}}
               >👑 관리자로 로그인</button>
             </>
