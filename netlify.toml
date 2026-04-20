@@ -13,6 +13,17 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
+# SW関連ファイルもキャッシュ禁止
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/workbox-*.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
 # JS/CSSはハッシュ付きファイル名なので長期キャッシュOK
 [[headers]]
   for = "/assets/*"
