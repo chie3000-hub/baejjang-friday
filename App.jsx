@@ -768,6 +768,10 @@ export default function App() {
                 <label htmlFor="remember" style={{fontSize:12,color:"var(--mu)",cursor:"pointer",userSelect:"none"}}>로그인 정보 저장</label>
               </div>
               <button className="btn-primary" onClick={handleLogin}>로그인</button>
+              <button
+                onClick={()=>{ setLName(ADMIN_NAME); setLPw(ADMIN_PW); setTimeout(handleLogin, 50); }}
+                style={{background:"rgba(245,197,66,0.1)",border:"1px solid rgba(245,197,66,0.3)",color:"var(--yw)",borderRadius:12,padding:"12px",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:4}}
+              >👑 관리자로 로그인</button>
             </>
           ) : (
             <>
