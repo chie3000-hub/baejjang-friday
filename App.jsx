@@ -522,16 +522,8 @@ export default function App() {
       const { data: d } = await supabase.from("users")
         .select("id, name, nickname, birthday, role, avatar, joined_at")
         .eq("name", ADMIN_NAME).maybeSingle();
-      if (d) {
-        data = d;
-      } else {
-        // DB에 관리자 레코드가 없으면 자동 생성
-        const { data: inserted } = await supabase.from("users")
-          .insert({ name: ADMIN_NAME, password: ADMIN_PW, role: "admin", avatar: "👑" })
-          .select("id, name, nickname, birthday, role, avatar, joined_at")
-          .single();
-        data = inserted;
-      }
+      // DB에 관리자 레코드가 없어도 가상 객체로 로그인
+      data = d || { id: 0, name: ADMIN_NAME, nickname: "", birthday: "", role: "admin", avatar: "👑", joined_at: null };
     } else {
       // 일반 회원: DB 비밀번호로 인증
       const { data: d } = await supabase.from("users")
