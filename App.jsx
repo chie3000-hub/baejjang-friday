@@ -695,7 +695,7 @@ export default function App() {
     if (!name) return showToast("게스트 이름을 입력해주세요.");
     const average = inp.average ? parseInt(inp.average) : null;
     const { error } = await supabase.from("session_guests").insert({ session_id: sid, name, average, added_by: user.id || null });
-    if (error) return showToast("오류: " + error.message);
+    if (error) return showToast("게스트 추가 중 오류가 발생했습니다.");
     setGuestInputs(prev => ({ ...prev, [sid]: { name: "", average: "" } }));
     setShowGuestForm(prev => ({ ...prev, [sid]: false }));
     await loadSessions();
