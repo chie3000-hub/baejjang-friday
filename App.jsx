@@ -1391,12 +1391,12 @@ export default function App() {
                   const allScores = sessions.flatMap(s =>
                     ((s.scores[m.id]?.games) || []).filter(g => g !== null && g !== undefined)
                   );
+                  const total = allScores.reduce((a,b)=>a+b,0);
                   const avg = allScores.length > 0
-                    ? Math.round(allScores.reduce((a,b)=>a+b,0) / allScores.length * 10) / 10
+                    ? Math.round(total / allScores.length * 10) / 10
                     : null;
-                  const best = allScores.length > 0 ? Math.max(...allScores) : null;
                   const games = allScores.length;
-                  return { ...m, avg, best, games };
+                  return { ...m, avg, total, games };
                 }).filter(m => m.avg !== null).sort((a,b) => b.avg - a.avg);
                 return (
                   <div style={{marginBottom:24}}>
@@ -1418,9 +1418,19 @@ export default function App() {
                                 <div style={{fontSize:13,fontWeight:700}}>{m.name}{m.nickname&&<span style={{fontSize:11,color:"var(--ac)",marginLeft:6}}>「{m.nickname}」</span>}</div>
                                 <div style={{fontSize:11,color:"var(--mu)",marginTop:2}}>{m.games}게임</div>
                               </div>
-                              <div style={{textAlign:"right"}}>
-                                <div style={{fontSize:22,fontWeight:900,color:"var(--ac)"}}>{m.avg}</div>
-                                <div style={{fontSize:10,color:"var(--mu)"}}>최고 {m.best}</div>
+                              <div style={{display:"flex",gap:16,alignItems:"center"}}>
+                                <div style={{textAlign:"center"}}>
+                                  <div style={{fontSize:11,color:"var(--mu)",marginBottom:2}}>게임수</div>
+                                  <div style={{fontSize:16,fontWeight:800}}>{m.games}</div>
+                                </div>
+                                <div style={{textAlign:"center"}}>
+                                  <div style={{fontSize:11,color:"var(--mu)",marginBottom:2}}>토탈핀</div>
+                                  <div style={{fontSize:16,fontWeight:800,color:"var(--yw)"}}>{m.total}</div>
+                                </div>
+                                <div style={{textAlign:"center"}}>
+                                  <div style={{fontSize:11,color:"var(--mu)",marginBottom:2}}>아베</div>
+                                  <div style={{fontSize:22,fontWeight:900,color:"var(--ac)"}}>{m.avg}</div>
+                                </div>
                               </div>
                             </div>
                           ))}
