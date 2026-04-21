@@ -1397,62 +1397,43 @@ export default function App() {
           })()}
 
           {/* ── 관리자 ── */}
-          {tab==="admin" && isAdmin && (
+          {tab==="admin" && isAdmin && (() => {
+            const adminRanking = members.map(m => {
+              const allScores = sessions.flatMap(s =>
+                ((s.scores || {})[m.id]?.games || []).filter(g => g !== null && g !== undefined && !isNaN(g))
+              );
+              const total = allScores.reduce((a,b)=>a+b,0);
+              const avg = allScores.length > 0 ? Math.round(total/allScores.length*10)/10 : null;
+              return { ...m, avg, total, games: allScores.length };
+            }).filter(m => m.avg !== null).sort((a,b) => b.avg - a.avg);
+            return (
             <>
               {/* ── 아베레지 랭킹 ── */}
-              {(() => {
-                const ranking = members.map(m => {
-                  const allScores = sessions.flatMap(s =>
-                    ((s.scores[m.id]?.games) || []).filter(g => g !== null && g !== undefined)
-                  );
-                  const total = allScores.reduce((a,b)=>a+b,0);
-                  const avg = allScores.length > 0
-                    ? Math.round(total / allScores.length * 10) / 10
-                    : null;
-                  const games = allScores.length;
-                  return { ...m, avg, total, games };
-                }).filter(m => m.avg !== null).sort((a,b) => b.avg - a.avg);
-                return (
-                  <div style={{marginBottom:24}}>
-                    <div className="section-label">🏆 아베레지 랭킹</div>
-                    {ranking.length === 0
-                      ? <div style={{fontSize:13,color:"var(--mu)",padding:"12px 0"}}>아직 스코어 데이터가 없습니다.</div>
-                      : <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden"}}>
-                          {ranking.map((m, i) => (
-                            <div key={m.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderTop:i===0?"none":"1px solid var(--bd)"}}>
-                              <div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,flexShrink:0,
-                                background:i===0?"rgba(245,197,66,0.2)":i===1?"rgba(180,180,180,0.2)":i===2?"rgba(180,100,50,0.2)":"var(--s2)",
-                                color:i===0?"var(--yw)":i===1?"#aaa":i===2?"#cd7f32":"var(--mu)",
-                                border:`1px solid ${i===0?"rgba(245,197,66,0.4)":i===1?"rgba(180,180,180,0.3)":i===2?"rgba(180,100,50,0.3)":"var(--bd)"}`
-                              }}>
-                                {i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}
-                              </div>
-                              <span style={{fontSize:20,lineHeight:1}}>{m.avatar}</span>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:13,fontWeight:700}}>{m.name}{m.nickname&&<span style={{fontSize:11,color:"var(--ac)",marginLeft:6}}>「{m.nickname}」</span>}</div>
-                                <div style={{fontSize:11,color:"var(--mu)",marginTop:2}}>{m.games}게임</div>
-                              </div>
-                              <div style={{display:"flex",gap:16,alignItems:"center"}}>
-                                <div style={{textAlign:"center"}}>
-                                  <div style={{fontSize:11,color:"var(--mu)",marginBottom:2}}>게임수</div>
-                                  <div style={{fontSize:16,fontWeight:800}}>{m.games}</div>
-                                </div>
-                                <div style={{textAlign:"center"}}>
-                                  <div style={{fontSize:11,color:"var(--mu)",marginBottom:2}}>토탈핀</div>
-                                  <div style={{fontSize:16,fontWeight:800,color:"var(--yw)"}}>{m.total}</div>
-                                </div>
-                                <div style={{textAlign:"center"}}>
-                                  <div style={{fontSize:11,color:"var(--mu)",marginBottom:2}}>아베</div>
-                                  <div style={{fontSize:22,fontWeight:900,color:"var(--ac)"}}>{m.avg}</div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+              <div style={{marginBottom:24}}>
+                <div className="section-label">🏆 아베레지 랭킹</div>
+                {adminRanking.length === 0 ? (
+                  <div style={{fontSize:13,color:"var(--mu)",padding:"12px 0"}}>아직 스코어 데이터가 없습니다.</div>
+                ) : (
+                  <div style={{background:"var(--s1)",border:"1px solid var(--bd)",borderRadius:"var(--r)",overflow:"hidden"}}>
+                    {adminRanking.map((m, i) => (
+                      <div key={m.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderTop:i===0?"none":"1px solid var(--bd)"}}>
+                        <div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,flexShrink:0,background:i===0?"rgba(245,197,66,0.2)":i===1?"rgba(180,180,180,0.2)":i===2?"rgba(180,100,50,0.2)":"var(--s2)",color:i===0?"var(--yw)":i===1?"#aaa":i===2?"#cd7f32":"var(--mu)",border:`1px solid ${i===0?"rgba(245,197,66,0.4)":i===1?"rgba(180,180,180,0.3)":i===2?"rgba(180,100,50,0.3)":"var(--bd)"}`}}>
+                          {i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}
                         </div>
-                    }
+                        <span style={{fontSize:20,lineHeight:1}}>{m.avatar}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:700}}>{m.name}{m.nickname&&<span style={{fontSize:11,color:"var(--ac)",marginLeft:6}}>「{m.nickname}」</span>}</div>
+                        </div>
+                        <div style={{display:"flex",gap:14,alignItems:"center"}}>
+                          <div style={{textAlign:"center"}}><div style={{fontSize:10,color:"var(--mu)"}}>게임수</div><div style={{fontSize:15,fontWeight:800}}>{m.games}</div></div>
+                          <div style={{textAlign:"center"}}><div style={{fontSize:10,color:"var(--mu)"}}>토탈핀</div><div style={{fontSize:15,fontWeight:800,color:"var(--yw)"}}>{m.total}</div></div>
+                          <div style={{textAlign:"center"}}><div style={{fontSize:10,color:"var(--mu)"}}>아베</div><div style={{fontSize:20,fontWeight:900,color:"var(--ac)"}}>{m.avg}</div></div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                );
-              })()}
+                )}
+              </div>
 
               {/* ── 상품 관리 ── */}
               <div style={{marginBottom:24}}>
@@ -1850,7 +1831,8 @@ export default function App() {
                 );
               })}
             </>
-          )}
+            );
+          })()}
 
         </main>
       </div>
