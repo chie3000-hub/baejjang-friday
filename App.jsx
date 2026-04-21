@@ -499,9 +499,10 @@ export default function App() {
 
   // ログイン済みユーザーの nickname/birthday を DB から同期（localStorage 復元時に欠ける場合の対策）
   useEffect(() => {
-    if (!user || users.length === 0) return;
+    if (!user || user.role === "admin" || users.length === 0) return;
     const fresh = users.find(u => u.id === user.id);
-    if (!fresh) return;
+    // DBから削除されたユーザーは強制ログアウト
+    if (!fresh) { localStorage.removeItem("bjf_session"); setUser(null); return; }
     if (fresh.nickname !== (user.nickname ?? "") || fresh.birthday !== (user.birthday ?? "")) {
       const updated = { ...user, nickname: fresh.nickname || "", birthday: fresh.birthday || "" };
       setUser(updated);
