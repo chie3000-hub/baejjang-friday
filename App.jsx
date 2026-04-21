@@ -337,14 +337,9 @@ export default function App() {
   const [productDeleteId, setProductDeleteId] = useState(null);
 
   const [user, setUser] = useState(() => {
-    try {
-      const d = localStorage.getItem("bjf_session");
-      if (!d) return null;
-      const u = JSON.parse(d);
-      // 管理者セッションは永続化しない（残っていたらクリア）
-      if (u?.role === "admin") { localStorage.removeItem("bjf_session"); return null; }
-      return u;
-    } catch { return null; }
+    // セッションは永続化しない（毎回ログイン必須）
+    localStorage.removeItem("bjf_session");
+    return null;
   });
   const [authMode, setAuthMode] = useState("login");
   const [tab, setTab] = useState("schedule");
@@ -507,7 +502,6 @@ export default function App() {
     if (fresh.nickname !== (user.nickname ?? "") || fresh.birthday !== (user.birthday ?? "")) {
       const updated = { ...user, nickname: fresh.nickname || "", birthday: fresh.birthday || "" };
       setUser(updated);
-      localStorage.setItem("bjf_session", JSON.stringify(updated));
     }
   }, [users]);
 
@@ -562,7 +556,6 @@ export default function App() {
         localStorage.removeItem("bjf_saved_name");
         localStorage.setItem("bjf_remember", "0");
       }
-      localStorage.setItem("bjf_session", JSON.stringify(u));
       setUser(u);
     } else {
       setLErr("이름 또는 비밀번호가 틀렸습니다.");
@@ -595,7 +588,6 @@ export default function App() {
     if (error) return setProfileErr(error.code === "23505" ? "이미 사용 중인 이름입니다." : "저장 중 오류가 발생했습니다.");
     const updated = { ...user, name: editName.trim(), nickname: editNickname.trim(), birthday: editBirthday || "", avatar: editAvatar };
     setUser(updated);
-    localStorage.setItem("bjf_session", JSON.stringify(updated));
     await loadUsers();
     setProfileSuc("프로필이 저장되었습니다 ✓");
     setEditPw(""); setEditPw2("");
