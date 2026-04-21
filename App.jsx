@@ -830,7 +830,7 @@ export default function App() {
     { id:"gallery",  label:"갤러리",   icon:"img" },
     { id:"rules",    label:"규칙/방법",  icon:"book" },
     { id:"board",    label:"자유게시판",icon:"msg" },
-    { id:"mypage",   label:"내 정보",   icon:"trophy" },
+    ...(!isAdmin ? [{ id:"mypage", label:"내 정보", icon:"trophy" }] : []),
     ...(isAdmin ? [{ id:"admin", label:"관리", icon:"admin" }] : []),
   ];
 
@@ -1718,27 +1718,63 @@ export default function App() {
                       })}
                     </div>
 
-                    {/* 출결 명단 */}
+                    {/* 참가자 명단 */}
                     <div className="acard-hdr" onClick={()=>setExpanded(isExp?null:s.id)} style={{padding:"10px 18px",borderTop:"1px solid var(--bd)"}}>
-                      <span style={{fontSize:12,color:"var(--mu)",fontWeight:600}}>출결 명단 보기</span>
+                      <span style={{fontSize:12,color:"var(--mu)",fontWeight:600}}>참가자 명단 보기</span>
                       {chev(isExp)}
                     </div>
                     {isExp && (
-                      <div className="abody">
-                        <table className="ptbl">
-                          <thead><tr><th>멤버</th><th>출결</th></tr></thead>
-                          <tbody>
-                            {members.map(m=>{
-                              const st = s.participants[m.id];
-                              return (
-                                <tr key={m.id}>
-                                  <td><span style={{marginRight:6}}>{m.avatar}</span>{m.name}</td>
-                                  <td><span className={st==="join"?"sj":st==="skip"?"ss":"sn"}>{st==="join"?"✓ 참가":st==="skip"?"✕ 불참":"—"}</span></td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                      <div className="abody" style={{padding:"14px 18px",display:"flex",flexDirection:"column",gap:14}}>
+                        {/* 사용자 */}
+                        <div>
+                          <div style={{fontSize:11,fontWeight:700,color:"var(--mu)",letterSpacing:"0.08em",marginBottom:8}}>👤 사용자 ({members.filter(m=>s.participants[m.id]==="join").length}명)</div>
+                          {members.filter(m=>s.participants[m.id]==="join").length === 0
+                            ? <div style={{fontSize:12,color:"var(--mu)",padding:"6px 0"}}>참가 신청 없음</div>
+                            : <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                                {members.map(m=>{
+                                  const st = s.participants[m.id];
+                                  return (
+                                    <div key={m.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",background:"var(--s2)",borderRadius:8,border:"1px solid var(--bd)"}}>
+                                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                        <span style={{fontSize:18,lineHeight:1}}>{m.avatar}</span>
+                                        <span style={{fontSize:13,fontWeight:600}}>{m.name}</span>
+                                        {m.nickname && <span style={{fontSize:11,color:"var(--ac)"}}>「{m.nickname}」</span>}
+                                      </div>
+                                      <span style={{fontSize:12,fontWeight:700,color:st==="join"?"var(--gn)":st==="skip"?"var(--rd)":"var(--mu)"}}>
+                                        {st==="join"?"✓ 참가":st==="skip"?"✕ 불참":"— 미정"}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                          }
+                        </div>
+                        {/* 게스트 */}
+                        <div>
+                          <div style={{fontSize:11,fontWeight:700,color:"var(--mu)",letterSpacing:"0.08em",marginBottom:8}}>🎳 게스트 ({(s.guests||[]).length}명)</div>
+                          {(s.guests||[]).length === 0
+                            ? <div style={{fontSize:12,color:"var(--mu)",padding:"6px 0"}}>게스트 없음</div>
+                            : <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                                {(s.guests||[]).map(g=>(
+                                  <div key={g.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",background:"rgba(245,197,66,0.06)",borderRadius:8,border:"1px solid rgba(245,197,66,0.2)"}}>
+                                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                      <span style={{fontSize:18,lineHeight:1}}>🎳</span>
+                                      <span style={{fontSize:13,fontWeight:600,color:"var(--yw)"}}>{g.name}</span>
+                                    </div>
+                                    <span style={{fontSize:12,color:"var(--mu)"}}>
+                                      {g.average ? `ave ${g.average}` : "ave —"}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                          }
+                        </div>
+                        {/* 합계 */}
+                        <div style={{borderTop:"1px solid var(--bd)",paddingTop:10,display:"flex",gap:16,fontSize:12,color:"var(--mu)"}}>
+                          <span>총 참가 <strong style={{color:"var(--gn)"}}>{members.filter(m=>s.participants[m.id]==="join").length + (s.guests||[]).length}명</strong></span>
+                          <span>불참 <strong style={{color:"var(--rd)"}}>{members.filter(m=>s.participants[m.id]==="skip").length}명</strong></span>
+                          <span>미정 <strong>{members.filter(m=>!s.participants[m.id]).length}명</strong></span>
+                        </div>
                       </div>
                     )}
                   </div>
