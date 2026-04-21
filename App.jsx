@@ -505,14 +505,43 @@ export default function App() {
     }
   }, [users]);
 
+  const showPushNotification = useCallback((title, body) => {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title, { body, icon: "/icon-192.png", badge: "/icon-192.png", vibrate: [200, 100, 200] });
+      }).catch(() => new Notification(title, { body, icon: "/icon-192.png" }));
+    } else {
+      new Notification(title, { body, icon: "/icon-192.png" });
+    }
+  }, []);
+
   useEffect(() => {
     const chan = supabase.channel("bjf-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "participants" }, loadSessions)
       .on("postgres_changes", { event: "*", schema: "public", table: "scores" }, loadSessions)
-      .on("postgres_changes", { event: "*", schema: "public", table: "session_guests" }, loadSessions)
+      .on("postgres_changes", { event: "*", schema: "public", table: "session_guests" }, (payload) => {
+        loadSessions();
+        if (payload.eventType === "INSERT") showPushNotification("🎳 게스트 추가", `${payload.new.name}님이 참가 예정입니다.`);
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "session_comments" }, (payload) => {
+        loadSessions();
+        showPushNotification("💬 새 댓글", "리그전에 새 댓글이 달렸습니다.");
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, (payload) => {
+        loadPosts();
+        showPushNotification("📝 새 게시글", "자유게시판에 새 글이 올라왔습니다.");
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "announcements" }, (payload) => {
+        loadAnnouncements();
+        showPushNotification("📢 새 공지", "새로운 공지사항이 등록되었습니다.");
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "participants" }, (payload) => {
+        showPushNotification("✅ 참가 신청", "누군가 리그전에 참가 신청했습니다.");
+      })
       .subscribe();
     return () => supabase.removeChannel(chan);
-  }, [loadSessions]);
+  }, [loadSessions, loadPosts, loadAnnouncements, showPushNotification]);
 
   // ── Auth ──
   const handleAdminLogin = async () => {
@@ -523,6 +552,7 @@ export default function App() {
     const data = d || { id: 0, name: ADMIN_NAME, nickname: "", birthday: "", role: "admin", avatar: "👑", joined_at: null };
     const u = { id: data.id, name: data.name, nickname: data.nickname || "", birthday: data.birthday || "", role: data.role, avatar: data.avatar, joinedAt: data.joined_at };
     // 管理者セッションはlocalStorageに保存しない（毎回認証必須）
+    if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
     setUser(u);
   };
 
@@ -556,6 +586,7 @@ export default function App() {
         localStorage.removeItem("bjf_saved_name");
         localStorage.setItem("bjf_remember", "0");
       }
+      if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
       setUser(u);
     } else {
       setLErr("이름 또는 비밀번호가 틀렸습니다.");
