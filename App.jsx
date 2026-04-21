@@ -908,7 +908,7 @@ export default function App() {
                   등록된 리그전이 없습니다
                 </div>
               )}
-              {sessions.map((s,i) => {
+              {sessions.slice(-2).map((s,i) => {
                 const myStatus = s.participants[user.id];
                 const guestList = s.guests || [];
                 const joinCount = Object.values(s.participants).filter(v=>v==="join").length + guestList.length;
