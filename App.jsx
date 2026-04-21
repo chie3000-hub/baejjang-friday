@@ -1691,7 +1691,7 @@ export default function App() {
               </div>
 
               <div className="section-label">출결 현황 / 참가비 설정</div>
-              {sessions.map((s,i)=>{
+              {sessions.slice(-2).map((s,i)=>{
                 const joinCnt = Object.values(s.participants).filter(v=>v==="join").length;
                 const skipCnt = Object.values(s.participants).filter(v=>v==="skip").length;
                 const isExp = expanded===s.id;
