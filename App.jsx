@@ -336,7 +336,14 @@ export default function App() {
   const [productDeleteId, setProductDeleteId] = useState(null);
 
   const [user, setUser] = useState(() => {
-    try { const d = localStorage.getItem("bjf_session"); return d ? JSON.parse(d) : null; } catch { return null; }
+    try {
+      const d = localStorage.getItem("bjf_session");
+      if (!d) return null;
+      const u = JSON.parse(d);
+      // 管理者セッションは永続化しない（残っていたらクリア）
+      if (u?.role === "admin") { localStorage.removeItem("bjf_session"); return null; }
+      return u;
+    } catch { return null; }
   });
   const [authMode, setAuthMode] = useState("login");
   const [tab, setTab] = useState("schedule");
@@ -519,7 +526,7 @@ export default function App() {
       .eq("name", ADMIN_NAME).maybeSingle();
     const data = d || { id: 0, name: ADMIN_NAME, nickname: "", birthday: "", role: "admin", avatar: "👑", joined_at: null };
     const u = { id: data.id, name: data.name, nickname: data.nickname || "", birthday: data.birthday || "", role: data.role, avatar: data.avatar, joinedAt: data.joined_at };
-    localStorage.setItem("bjf_session", JSON.stringify(u));
+    // 管理者セッションはlocalStorageに保存しない（毎回認証必須）
     setUser(u);
   };
 
