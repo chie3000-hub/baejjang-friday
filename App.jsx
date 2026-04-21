@@ -410,7 +410,7 @@ export default function App() {
   // ── Supabase 데이터 로딩 ──
   const loadUsers = useCallback(async () => {
     const { data } = await supabase.from("users").select("id, name, nickname, birthday, role, avatar, joined_at").order("joined_at");
-    if (data) setUsers(data.map(u => ({ id: u.id, name: u.name, nickname: u.nickname || "", birthday: u.birthday || "", role: u.role, avatar: u.avatar, joinedAt: u.joined_at })));
+    if (data) setUsers(data.map(u => ({ id: u.id, name: u.name, nickname: u.nickname || "", birthday: u.birthday || "", role: u.role || "member", avatar: u.avatar, joinedAt: u.joined_at })));
   }, []);
 
   const loadSessions = useCallback(async () => {
@@ -1789,7 +1789,7 @@ export default function App() {
                       <div className="abody" style={{padding:"14px 18px",display:"flex",flexDirection:"column",gap:14}}>
                         {/* 사용자 */}
                         <div>
-                          <div style={{fontSize:11,fontWeight:700,color:"var(--mu)",letterSpacing:"0.08em",marginBottom:8}}>👤 사용자 ({members.filter(m=>s.participants[m.id]==="join").length}명)</div>
+                          <div style={{fontSize:11,fontWeight:700,color:"var(--mu)",letterSpacing:"0.08em",marginBottom:8}}>👤 사용자 (참가 {members.filter(m=>s.participants[m.id]==="join").length}명 / 전체 {members.length}명)</div>
                           <div style={{display:"flex",flexDirection:"column",gap:4}}>
                             {members.map(m=>{
                               const st = s.participants[m.id];
