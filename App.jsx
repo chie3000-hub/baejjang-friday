@@ -610,6 +610,18 @@ export default function App() {
     await loadSessions();
   };
 
+  const adminToggleParticipant = async (sid, uid, status) => {
+    const s = sessions.find(x => x.id === sid);
+    if (!s) return;
+    const cur = s.participants[uid];
+    if (cur === status) {
+      await supabase.from("participants").delete().eq("session_id", sid).eq("user_id", uid);
+    } else {
+      await supabase.from("participants").upsert({ session_id: sid, user_id: uid, status });
+    }
+    await loadSessions();
+  };
+
   const submitGallery = async () => {
     if (!galForm.caption) return showToast("설명을 입력해 주세요.");
     let url = "";
@@ -1778,26 +1790,24 @@ export default function App() {
                         {/* 사용자 */}
                         <div>
                           <div style={{fontSize:11,fontWeight:700,color:"var(--mu)",letterSpacing:"0.08em",marginBottom:8}}>👤 사용자 ({members.filter(m=>s.participants[m.id]==="join").length}명)</div>
-                          {members.filter(m=>s.participants[m.id]==="join").length === 0
-                            ? <div style={{fontSize:12,color:"var(--mu)",padding:"6px 0"}}>참가 신청 없음</div>
-                            : <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                                {members.map(m=>{
-                                  const st = s.participants[m.id];
-                                  return (
-                                    <div key={m.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",background:"var(--s2)",borderRadius:8,border:"1px solid var(--bd)"}}>
-                                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                                        <span style={{fontSize:18,lineHeight:1}}>{m.avatar}</span>
-                                        <span style={{fontSize:13,fontWeight:600}}>{m.name}</span>
-                                        {m.nickname && <span style={{fontSize:11,color:"var(--ac)"}}>「{m.nickname}」</span>}
-                                      </div>
-                                      <span style={{fontSize:12,fontWeight:700,color:st==="join"?"var(--gn)":st==="skip"?"var(--rd)":"var(--mu)"}}>
-                                        {st==="join"?"✓ 참가":st==="skip"?"✕ 불참":"— 미정"}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                          }
+                          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                            {members.map(m=>{
+                              const st = s.participants[m.id];
+                              return (
+                                <div key={m.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",background:"var(--s2)",borderRadius:8,border:"1px solid var(--bd)"}}>
+                                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                    <span style={{fontSize:18,lineHeight:1}}>{m.avatar}</span>
+                                    <span style={{fontSize:13,fontWeight:600}}>{m.name}</span>
+                                    {m.nickname && <span style={{fontSize:11,color:"var(--ac)"}}>「{m.nickname}」</span>}
+                                  </div>
+                                  <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                                    <button onClick={()=>adminToggleParticipant(s.id,m.id,"join")} style={{background:st==="join"?"var(--gn)":"var(--s1)",border:`1px solid ${st==="join"?"var(--gn)":"var(--bd)"}`,color:st==="join"?"#fff":"var(--mu)",borderRadius:7,padding:"3px 10px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>✓</button>
+                                    <button onClick={()=>adminToggleParticipant(s.id,m.id,"skip")} style={{background:st==="skip"?"var(--rd)":"var(--s1)",border:`1px solid ${st==="skip"?"var(--rd)":"var(--bd)"}`,color:st==="skip"?"#fff":"var(--mu)",borderRadius:7,padding:"3px 10px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>✕</button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                         {/* 게스트 */}
                         <div>
