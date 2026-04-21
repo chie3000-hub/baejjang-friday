@@ -611,9 +611,19 @@ export default function App() {
   };
 
   const submitGallery = async () => {
-    if (!galForm.caption || !galForm.url) return;
-    await supabase.from("gallery").insert({ user_id: user.id, session_label: galForm.sessionLabel || "자유 게시", url: galForm.url, caption: galForm.caption });
-    setGalForm({ sessionLabel: "", caption: "", url: "" }); setShowGalForm(false);
+    if (!galForm.caption) return showToast("설명을 입력해 주세요.");
+    let url = "";
+    if (galForm.file) {
+      const ext = galForm.file.name.split(".").pop();
+      const path = `${Date.now()}_${user.id}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("gallery").upload(path, galForm.file, { upsert: true });
+      if (upErr) return showToast("이미지 업로드 실패: " + upErr.message);
+      const { data: pub } = supabase.storage.from("gallery").getPublicUrl(path);
+      url = pub.publicUrl;
+    }
+    if (!url) return showToast("이미지를 선택해 주세요.");
+    await supabase.from("gallery").insert({ user_id: user.id, session_label: galForm.sessionLabel || "자유 게시", url, caption: galForm.caption });
+    setGalForm({ sessionLabel: "", caption: "", url: "", file: null }); setShowGalForm(false);
     await loadGallery();
   };
 
@@ -1040,7 +1050,11 @@ export default function App() {
                 <div className="form-box">
                   <div className="form-title">📸 새 게시물 업로드</div>
                   <div className="frow"><label>회차 (선택)</label><input placeholder="예: 4월 18일 리그전" value={galForm.sessionLabel} onChange={e=>setGalForm(p=>({...p,sessionLabel:e.target.value}))}/></div>
-                  <div className="frow"><label>이미지 URL *</label><input placeholder="https://..." value={galForm.url} onChange={e=>setGalForm(p=>({...p,url:e.target.value}))}/></div>
+                  <div className="frow">
+                    <label>이미지 *</label>
+                    <input type="file" accept="image/*,video/*" style={{color:"var(--tx)",fontFamily:"inherit",fontSize:13}} onChange={e=>{ const f=e.target.files[0]; if(f) setGalForm(p=>({...p,file:f})); }}/>
+                    {galForm.file && <div style={{fontSize:12,color:"var(--gn)",marginTop:4}}>✓ {galForm.file.name}</div>}
+                  </div>
                   <div className="frow"><label>설명 *</label><textarea rows={3} placeholder="사진 설명 입력" value={galForm.caption} onChange={e=>setGalForm(p=>({...p,caption:e.target.value}))}/></div>
                   <div className="fbtns"><button className="btn-ac" onClick={submitGallery}>업로드</button><button className="btn-ghost" onClick={()=>setShowGalForm(false)}>취소</button></div>
                 </div>
