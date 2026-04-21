@@ -544,9 +544,10 @@ export default function App() {
       data = d || { id: 0, name: ADMIN_NAME, nickname: "", birthday: "", role: "admin", avatar: "👑", joined_at: null };
     } else {
       // 일반 회원: DB 비밀번호로 인증
-      const { data: d } = await supabase.from("users")
+      const { data: d, error: e } = await supabase.from("users")
         .select("id, name, nickname, birthday, role, avatar, joined_at")
-        .eq("name", lName).eq("password", lPw).maybeSingle();
+        .eq("name", lName.trim()).eq("password", lPw).maybeSingle();
+      if (e) return setLErr("로그인 오류: " + e.message);
       data = d;
     }
 
