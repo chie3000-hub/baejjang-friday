@@ -49,6 +49,7 @@ const Ic = ({ n, s = 18 }) => {
     admin: <svg {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
     eye:   <svg {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
     trash: <svg {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
+    users: <svg {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   };
   return icons[n] || null;
 };
@@ -862,6 +863,7 @@ export default function App() {
     { id:"rules",    label:"규칙/방법",  icon:"book" },
     { id:"board",    label:"자유게시판",icon:"msg" },
     ...(!isAdmin ? [{ id:"mypage", label:"내 정보", icon:"trophy" }] : []),
+    ...(isAdmin ? [{ id:"members", label:"멤버", icon:"users" }] : []),
     ...(isAdmin ? [{ id:"admin", label:"관리", icon:"admin" }] : []),
   ];
 
@@ -1417,6 +1419,61 @@ export default function App() {
             );
           })()}
 
+          {/* ── 멤버 탭 ── */}
+          {tab==="members" && isAdmin && (
+            <div>
+              <div className="section-label">MEMBER LIST ({members.length}명)</div>
+              <div className="member-list">
+                {members.length === 0 && <div style={{color:"var(--mu)",fontSize:13,padding:"12px 0"}}>아직 가입한 멤버가 없습니다.</div>}
+                {members.map(m => {
+                  const mySessions = sessions.map(s => ({ status: s.participants[m.id] }));
+                  const joinCount = mySessions.filter(s => s.status === "join").length;
+                  const skipCount = mySessions.filter(s => s.status === "skip").length;
+                  const isConfirming = confirmDeleteUserId === m.id;
+                  return (
+                    <div className="member-row" key={m.id}>
+                      <div className="member-row-top">
+                        <div className="member-info">
+                          <div className="member-av">{m.avatar}</div>
+                          <div style={{minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                              <span className="member-name">{m.name}</span>
+                              {m.nickname && <span style={{fontSize:12,color:"var(--ac)",fontWeight:600}}>「{m.nickname}」</span>}
+                            </div>
+                            <div className="member-meta">
+                              <span>📅 가입 {m.joinedAt || "—"}</span>
+                              {m.birthday && <span>🎂 {m.birthday}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {isConfirming ? (
+                          <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                            <span style={{fontSize:11,color:"var(--rd)",fontWeight:700,whiteSpace:"nowrap"}}>정말요?</span>
+                            <button onClick={async ()=>{ await deleteUser(m.id); setConfirmDeleteUserId(null); }}
+                              style={{background:"var(--rd)",border:"none",color:"#fff",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>확인</button>
+                            <button onClick={()=>setConfirmDeleteUserId(null)}
+                              style={{background:"var(--s2)",border:"1px solid var(--bd)",color:"var(--mu)",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>취소</button>
+                          </div>
+                        ) : (
+                          <button className="del-btn" onClick={()=>{ setConfirmDeleteUserId(m.id); setTimeout(()=>setConfirmDeleteUserId(null),4000); }}><Ic n="trash" s={13}/>삭제</button>
+                        )}
+                      </div>
+                      <div className="member-extra">
+                        <div className="member-tag">출전 <b style={{color:"var(--gn)"}}>{joinCount}회</b></div>
+                        <div className="member-tag">불참 <b style={{color:"var(--rd)"}}>{skipCount}회</b></div>
+                        <div className="member-tag">미응답 <b>{sessions.length - joinCount - skipCount}회</b></div>
+                        {m.birthday && (() => {
+                          const diff = Math.floor((new Date() - new Date(m.birthday)) / (365.25 * 24 * 3600 * 1000));
+                          return <div className="member-tag">나이 <b>{diff}세</b></div>;
+                        })()}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* ── 관리자 ── */}
           {tab==="admin" && isAdmin && (() => {
             const adminRanking = members.map(m => {
@@ -1637,56 +1694,6 @@ export default function App() {
                 <div className="sbox"><div className="slbl">참가</div><div className="sval g">{totalJoins}</div></div>
                 <div className="sbox"><div className="slbl">불참</div><div className="sval r">{totalSkips}</div></div>
                 <div className="sbox"><div className="slbl">미응답</div><div className="sval">{totalPend}</div></div>
-              </div>
-
-              <div className="section-label">MEMBER LIST ({members.length}명)</div>
-              <div className="member-list">
-                {members.length === 0 && <div style={{color:"var(--mu)",fontSize:13,padding:"12px 0"}}>아직 가입한 멤버가 없습니다.</div>}
-                {members.map(m => {
-                  const mySessions = sessions.map(s => ({ status: s.participants[m.id] }));
-                  const joinCount = mySessions.filter(s => s.status === "join").length;
-                  const skipCount = mySessions.filter(s => s.status === "skip").length;
-                  const isConfirming = confirmDeleteUserId === m.id;
-                  return (
-                    <div className="member-row" key={m.id}>
-                      <div className="member-row-top">
-                        <div className="member-info">
-                          <div className="member-av">{m.avatar}</div>
-                          <div style={{minWidth:0}}>
-                            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                              <span className="member-name">{m.name}</span>
-                              {m.nickname && <span style={{fontSize:12,color:"var(--ac)",fontWeight:600}}>「{m.nickname}」</span>}
-                            </div>
-                            <div className="member-meta">
-                              <span>📅 가입 {m.joinedAt || "—"}</span>
-                              {m.birthday && <span>🎂 {m.birthday}</span>}
-                            </div>
-                          </div>
-                        </div>
-                        {isConfirming ? (
-                          <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-                            <span style={{fontSize:11,color:"var(--rd)",fontWeight:700,whiteSpace:"nowrap"}}>정말요?</span>
-                            <button onClick={async ()=>{ await deleteUser(m.id); setConfirmDeleteUserId(null); }}
-                              style={{background:"var(--rd)",border:"none",color:"#fff",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>확인</button>
-                            <button onClick={()=>setConfirmDeleteUserId(null)}
-                              style={{background:"var(--s2)",border:"1px solid var(--bd)",color:"var(--mu)",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>취소</button>
-                          </div>
-                        ) : (
-                          <button className="del-btn" onClick={()=>{ setConfirmDeleteUserId(m.id); setTimeout(()=>setConfirmDeleteUserId(null),4000); }}><Ic n="trash" s={13}/>삭제</button>
-                        )}
-                      </div>
-                      <div className="member-extra">
-                        <div className="member-tag">출전 <b style={{color:"var(--gn)"}}>{joinCount}회</b></div>
-                        <div className="member-tag">불참 <b style={{color:"var(--rd)"}}>{skipCount}회</b></div>
-                        <div className="member-tag">미응답 <b>{sessions.length - joinCount - skipCount}회</b></div>
-                        {m.birthday && (() => {
-                          const diff = Math.floor((new Date() - new Date(m.birthday)) / (365.25 * 24 * 3600 * 1000));
-                          return <div className="member-tag">나이 <b>{diff}세</b></div>;
-                        })()}
-                      </div>
-                    </div>
-                  );
-                })}
               </div>
 
               <div className="section-label">출결 현황 / 참가비 설정</div>
