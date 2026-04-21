@@ -957,15 +957,17 @@ export default function App() {
                     </div>
 
                     <div style={{padding:"0 18px 16px",borderTop:"1px solid var(--bd)"}}>
-                      <div className="arow" style={{marginTop:14}}>
-                        {closed
-                          ? <div className="btn-disabled">🔒 신청 마감 (17:00)</div>
-                          : <>
-                              <button className={`bjoin ${myStatus==="join"?"on":""}`} onClick={()=>toggleParticipant(s.id,"join")}><Ic n="check" s={15}/>참가</button>
-                              <button className={`bskip ${myStatus==="skip"?"on":""}`} onClick={()=>toggleParticipant(s.id,"skip")}><Ic n="x" s={15}/>불참</button>
-                            </>
-                        }
-                      </div>
+                      {!isAdmin && (
+                        <div className="arow" style={{marginTop:14}}>
+                          {closed
+                            ? <div className="btn-disabled">🔒 신청 마감 (17:00)</div>
+                            : <>
+                                <button className={`bjoin ${myStatus==="join"?"on":""}`} onClick={()=>toggleParticipant(s.id,"join")}><Ic n="check" s={15}/>참가</button>
+                                <button className={`bskip ${myStatus==="skip"?"on":""}`} onClick={()=>toggleParticipant(s.id,"skip")}><Ic n="x" s={15}/>불참</button>
+                              </>
+                          }
+                        </div>
+                      )}
                       <div className="pcnt" style={{marginTop:10}}><Ic n="users" s={13}/>현재 참가 예정: <strong style={{color:"var(--tx)",marginLeft:4}}>{joinCount}명</strong></div>
                       {joinCount > 0 && (
                         <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:8}}>
